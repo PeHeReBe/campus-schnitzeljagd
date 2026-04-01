@@ -1,4 +1,10 @@
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
 :root {
   --primary: #2563eb;
@@ -23,14 +29,22 @@ header {
   background: var(--primary);
   color: white;
   padding: 1rem 1.5rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
-header h1 { font-size: 1.4rem; margin-bottom: 0.5rem; }
 
-nav { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+header h1 {
+  font-size: 1.4rem;
+  margin-bottom: 0.5rem;
+}
+
+nav {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
 
 .nav-btn {
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
   border: none;
   color: white;
   padding: 0.4rem 1rem;
@@ -40,21 +54,40 @@ nav { display: flex; gap: 0.5rem; flex-wrap: wrap; }
   text-decoration: none;
   transition: background 0.2s;
 }
-.nav-btn:hover, .nav-btn.active { background: rgba(255,255,255,0.35); }
 
-main { max-width: 800px; margin: 1.5rem auto; padding: 0 1rem; }
+.nav-btn:hover,
+.nav-btn.active {
+  background: rgba(255, 255, 255, 0.35);
+}
 
-.view { display: none; }
-.view.active { display: block; }
+main {
+  max-width: 800px;
+  margin: 1.5rem auto;
+  padding: 0 1rem;
+}
+
+.view {
+  display: none;
+}
+
+.view.active {
+  display: block;
+}
 
 .card {
   background: var(--card);
   border-radius: var(--radius);
   padding: 1.5rem;
   margin-bottom: 1rem;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
-.card h2 { margin-bottom: 1rem; font-size: 1.2rem; }
+
+.card h2,
+.card .card-label {
+  margin-bottom: 1rem;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
 
 label {
   display: block;
@@ -62,7 +95,10 @@ label {
   font-size: 0.9rem;
   color: var(--text-muted);
 }
-input, textarea, select {
+
+input,
+textarea,
+select {
   display: block;
   width: 100%;
   padding: 0.5rem 0.75rem;
@@ -71,7 +107,11 @@ input, textarea, select {
   border-radius: 8px;
   font-size: 1rem;
 }
-textarea { resize: vertical; min-height: 60px; }
+
+textarea {
+  resize: vertical;
+  min-height: 60px;
+}
 
 button {
   background: var(--primary);
@@ -83,26 +123,54 @@ button {
   font-size: 0.95rem;
   transition: background 0.2s;
 }
-button:hover { background: var(--primary-dark); }
-button.danger { background: var(--danger); }
-button.danger:hover { background: #b91c1c; }
 
-.actions { display: flex; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; }
+button:hover {
+  background: var(--primary-dark);
+}
 
-.hidden { display: none !important; }
+button.danger {
+  background: var(--danger);
+}
 
-.error { color: var(--danger); margin-top: 0.5rem; font-size: 0.9rem; }
+button.danger:hover {
+  background: #b91c1c;
+}
+
+.actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.error {
+  color: var(--danger);
+  margin-top: 0.5rem;
+  font-size: 0.9rem;
+}
 
 table {
   width: 100%;
   border-collapse: collapse;
 }
-th, td {
+
+th,
+td {
   padding: 0.5rem 0.75rem;
   text-align: left;
   border-bottom: 1px solid #e2e8f0;
 }
-th { font-weight: 600; color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; }
+
+th {
+  font-weight: 600;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+}
 
 .station-card {
   background: #f8fafc;
@@ -111,9 +179,21 @@ th { font-weight: 600; color: var(--text-muted); font-size: 0.85rem; text-transf
   margin-bottom: 0.75rem;
   border-left: 4px solid var(--primary);
 }
-.station-card h3 { font-size: 1rem; margin-bottom: 0.25rem; }
-.station-card p { color: var(--text-muted); font-size: 0.9rem; }
-.station-card .points { color: var(--success); font-weight: 600; }
+
+.station-card h3 {
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.station-card p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.station-card .points {
+  color: var(--success);
+  font-weight: 600;
+}
 
 .station-admin {
   display: flex;
@@ -122,8 +202,16 @@ th { font-weight: 600; color: var(--text-muted); font-size: 0.85rem; text-transf
   flex-wrap: wrap;
   gap: 0.5rem;
 }
-.station-admin .btns { display: flex; gap: 0.5rem; }
-.station-admin button { padding: 0.3rem 0.8rem; font-size: 0.85rem; }
+
+.station-admin .btns {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.station-admin button {
+  padding: 0.3rem 0.8rem;
+  font-size: 0.85rem;
+}
 
 .stat-box {
   display: inline-block;
@@ -133,8 +221,17 @@ th { font-weight: 600; color: var(--text-muted); font-size: 0.85rem; text-transf
   margin: 0.5rem 0.5rem 0.5rem 0;
   text-align: center;
 }
-.stat-box .num { font-size: 2rem; font-weight: 700; color: var(--primary); }
-.stat-box .label { font-size: 0.85rem; color: var(--text-muted); }
+
+.stat-box .num {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.stat-box .label {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
 
 .toast {
   position: fixed;
@@ -149,12 +246,24 @@ th { font-weight: 600; color: var(--text-muted); font-size: 0.85rem; text-transf
   z-index: 999;
   transition: opacity 0.3s;
 }
-.toast.hidden { opacity: 0; pointer-events: none; }
+
+.toast.hidden {
+  opacity: 0;
+  pointer-events: none;
+}
 
 @media (max-width: 600px) {
-  header h1 { font-size: 1.1rem; }
-  main { padding: 0 0.5rem; }
-  .card { padding: 1rem; }
+  header h1 {
+    font-size: 1.1rem;
+  }
+
+  main {
+    padding: 0 0.5rem;
+  }
+
+  .card {
+    padding: 1rem;
+  }
 }
 
 /* Question type elements */
@@ -167,8 +276,14 @@ th { font-weight: 600; color: var(--text-muted); font-size: 0.85rem; text-transf
   cursor: pointer;
   transition: background 0.2s;
 }
-.mc-option:hover { background: #dbeafe; }
-.mc-option input { margin-right: 0.5rem; }
+
+.mc-option:hover {
+  background: #dbeafe;
+}
+
+.mc-option input {
+  margin-right: 0.5rem;
+}
 
 .badge {
   display: inline-block;
@@ -191,7 +306,8 @@ th { font-weight: 600; color: var(--text-muted); font-size: 0.85rem; text-transf
   border-left: 4px solid #f59e0b;
 }
 
-#q-fields label, #mc-fields label {
+#q-fields label,
+#mc-fields label {
   margin-top: 0.5rem;
 }
 

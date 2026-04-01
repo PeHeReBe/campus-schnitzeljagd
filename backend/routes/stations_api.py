@@ -22,7 +22,7 @@ def list_stations():
     return [_parse_choices(dict(r)) for r in rows]
 
 
-@router.get("/by-code/{code}")
+@router.get("/by-code/{code}", responses={404: {"description": "Station nicht gefunden"}})
 def get_station_by_code(code: str):
     db = get_db()
     row = db.execute(
@@ -34,7 +34,7 @@ def get_station_by_code(code: str):
     return _parse_choices(dict(row))
 
 
-@router.get("/{station_id}")
+@router.get("/{station_id}", responses={404: {"description": "Station nicht gefunden"}})
 def get_station(station_id: int):
     db = get_db()
     row = db.execute(

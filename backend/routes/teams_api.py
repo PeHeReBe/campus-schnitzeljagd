@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
-from typing import Optional
+from typing import Annotated, Optional
 import hashlib
 import json
 import os
@@ -64,7 +64,7 @@ def list_teams():
     return [dict(r) for r in rows]
 
 
-@router.post("/login")
+@router.post("/login", responses={401: {"description": "Ungültige Anmeldedaten"}})
 def login_team(body: TeamLogin):
     db = get_db()
     pin_hash = _hash(body.pin)
@@ -79,7 +79,8 @@ def login_team(body: TeamLogin):
     return {**dict(team), "scans": [dict(s) for s in scans]}
 
 
-@router.post("/token-login")
+@router.post("/token-login",
+             responses={400: {"description": "Token benötigt"}, 401: {"description": "Ungültiger Token"}})
 def token_login(body: TokenLogin):
     """Login via login_token (from QR code scan)."""
     if not body.token:
@@ -96,7 +97,24 @@ def token_login(body: TokenLogin):
     return {**dict(team), "scans": [dict(s) for s in scans]}
 
 
-@router.post("/{team_id}/scan")
+def _determine_scan_status(station, answer: str) -> tuple:
+    """Determine scan status and message based on question type."""
+    q_type = station["question_type"] or "qr_only"
+    if q_type == "multiple_choice":
+        if not answer:
+            raise HTTPException(400, "Antwort benötigt")
+        correct = station["correct_answer"]
+        if answer.strip() == (correct or "").strip():
+            return "approved", None
+        return "rejected", "Falsche Antwort! Keine Punkte."
+    if q_type in ("text_answer", "photo_upload"):
+        return "pending", "Antwort eingereicht! Ein Admin wird sie prüfen."
+    return "approved", None
+
+
+@router.post("/{team_id}/scan",
+             responses={400: {"description": "Ungültige Anfrage"}, 401: {"description": "Ungültige Team-Anmeldedaten"},
+                        404: {"description": "Station nicht gefunden"}, 409: {"description": "Station bereits beantwortet"}})
 def scan_station(team_id: int, body: ScanRequest):
     db = get_db()
     team = _auth_team(db, team_id, pin=body.pin, token=body.token)
@@ -104,24 +122,7 @@ def scan_station(team_id: int, body: ScanRequest):
     if not station:
         raise HTTPException(404, "Station nicht gefunden")
 
-    q_type = station["question_type"] or "qr_only"
-
-    # Determine status based on question type
-    if q_type == "multiple_choice":
-        # Auto-validate: check if answer matches correct_answer
-        if not body.answer:
-            raise HTTPException(400, "Antwort benötigt")
-        correct = station["correct_answer"]
-        if body.answer.strip() == correct.strip():
-            status = "approved"
-        else:
-            status = "rejected"
-    elif q_type in ("text_answer", "photo_upload"):
-        # Needs admin approval
-        status = "pending"
-    else:
-        # qr_only: auto-approved
-        status = "approved"
+    status, message = _determine_scan_status(station, body.answer or "")
 
     try:
         db.execute(
@@ -133,12 +134,10 @@ def scan_station(team_id: int, body: ScanRequest):
         if status == "approved":
             broadcast_sync({"type": "scan", "team": team["name"], "station": station["name"], "points": station["points"]})
 
-        result = {"success": True, "station": station["name"], "points": station["points"], "status": status}
-        if q_type == "multiple_choice" and status == "rejected":
-            result["message"] = "Falsche Antwort! Keine Punkte."
-            result["points"] = 0
-        elif status == "pending":
-            result["message"] = "Antwort eingereicht! Ein Admin wird sie prüfen."
+        points = 0 if status == "rejected" else station["points"]
+        result = {"success": True, "station": station["name"], "points": points, "status": status}
+        if message:
+            result["message"] = message
         return result
     except Exception as e:
         if "UNIQUE" in str(e):
@@ -146,8 +145,10 @@ def scan_station(team_id: int, body: ScanRequest):
         raise
 
 
-@router.post("/{team_id}/upload")
-def upload_photo(team_id: int, pin: str = Form(""), code: str = Form(...), token: str = Form(""), file: UploadFile = File(...)):
+@router.post("/{team_id}/upload",
+             responses={400: {"description": "Ungültige Anfrage"}, 401: {"description": "Ungültige Team-Anmeldedaten"},
+                        404: {"description": "Station nicht gefunden"}, 409: {"description": "Station bereits beantwortet"}})
+def upload_photo(team_id: int, code: Annotated[str, Form(...)], file: Annotated[UploadFile, File(...)], pin: Annotated[str, Form()] = "", token: Annotated[str, Form()] = ""):
     db = get_db()
     team = _auth_team(db, team_id, pin=pin, token=token)
     station = db.execute("SELECT * FROM stations WHERE code = ?", (code,)).fetchone()

@@ -89,7 +89,8 @@ class TestCampusHunt(unittest.TestCase):
         TestCampusHunt.team_id = data["id"]
 
     def test_09_reject_invalid_token(self):
-        r = client.post("/api/teams/token-login", json={"token": "invalid_token_xyz"})
+        test_input = "invalid_token_xyz"
+        r = client.post("/api/teams/token-login", json={"token": test_input})
         self.assertEqual(r.status_code, 401)
 
     def test_10_team_login_qr(self):

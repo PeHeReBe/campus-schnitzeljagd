@@ -5,7 +5,7 @@ import hashlib
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Annotated, Optional, List
 import os
 import qrcode
 
@@ -17,6 +17,8 @@ security = HTTPBasic()
 
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASS = os.environ.get("ADMIN_PASS", "campus2026")
+
+MSG_STATION_NOT_FOUND = "Station nicht gefunden"
 
 
 def require_admin(credentials: HTTPBasicCredentials = Depends(security)):
@@ -60,7 +62,8 @@ def list_stations():
     return [dict(r) for r in rows]
 
 
-@router.post("/stations", status_code=201, dependencies=[Depends(require_admin)])
+@router.post("/stations", status_code=201, dependencies=[Depends(require_admin)],
+             responses={400: {"description": "Ungültige Anfrage"}})
 def create_station(body: StationCreate):
     if not body.name or not body.name.strip():
         raise HTTPException(400, "Stationsname benötigt")
@@ -86,12 +89,13 @@ def create_station(body: StationCreate):
     return {"id": cur.lastrowid, "name": body.name.strip(), "code": code}
 
 
-@router.put("/stations/{station_id}", dependencies=[Depends(require_admin)])
+@router.put("/stations/{station_id}", dependencies=[Depends(require_admin)],
+            responses={404: {"description": "Station nicht gefunden"}})
 def update_station(station_id: int, body: StationUpdate):
     db = get_db()
     existing = db.execute("SELECT * FROM stations WHERE id = ?", (station_id,)).fetchone()
     if not existing:
-        raise HTTPException(404, "Station nicht gefunden")
+        raise HTTPException(404, MSG_STATION_NOT_FOUND)
     choices_val = json.dumps(body.choices, ensure_ascii=False) if body.choices is not None else existing["choices"]
     db.execute(
         """UPDATE stations SET name=?, description=?, lat=?, lng=?, points=?, sort_order=?,
@@ -114,23 +118,25 @@ def update_station(station_id: int, body: StationUpdate):
     return {"success": True}
 
 
-@router.delete("/stations/{station_id}", dependencies=[Depends(require_admin)])
+@router.delete("/stations/{station_id}", dependencies=[Depends(require_admin)],
+               responses={404: {"description": "Station nicht gefunden"}})
 def delete_station(station_id: int):
     db = get_db()
     db.execute("DELETE FROM scans WHERE station_id = ?", (station_id,))
     result = db.execute("DELETE FROM stations WHERE id = ?", (station_id,))
     db.commit()
     if result.rowcount == 0:
-        raise HTTPException(404, "Station nicht gefunden")
+        raise HTTPException(404, MSG_STATION_NOT_FOUND)
     return {"success": True}
 
 
-@router.get("/stations/{station_id}/qr", dependencies=[Depends(require_admin)])
+@router.get("/stations/{station_id}/qr", dependencies=[Depends(require_admin)],
+            responses={404: {"description": "Station nicht gefunden"}})
 def station_qr(station_id: int, request: Request, format: str = "png"):
     db = get_db()
     station = db.execute("SELECT * FROM stations WHERE id = ?", (station_id,)).fetchone()
     if not station:
-        raise HTTPException(404, "Station nicht gefunden")
+        raise HTTPException(404, MSG_STATION_NOT_FOUND)
 
     base_url = str(request.base_url).rstrip("/")
     scan_url = f"{base_url}/scan.html?code={station['code']}"
@@ -169,7 +175,8 @@ class AdminTeamCreate(BaseModel):
     name: str
 
 
-@router.post("/teams", status_code=201, dependencies=[Depends(require_admin)])
+@router.post("/teams", status_code=201, dependencies=[Depends(require_admin)],
+             responses={400: {"description": "Teamname benötigt"}, 409: {"description": "Teamname bereits vergeben"}})
 def create_team(body: AdminTeamCreate):
     if not body.name or not body.name.strip():
         raise HTTPException(400, "Teamname benötigt")
@@ -190,7 +197,8 @@ def create_team(body: AdminTeamCreate):
         raise
 
 
-@router.get("/teams/{team_id}/qr", dependencies=[Depends(require_admin)])
+@router.get("/teams/{team_id}/qr", dependencies=[Depends(require_admin)],
+            responses={404: {"description": "Team nicht gefunden"}})
 def team_login_qr(team_id: int, request: Request, format: str = "png"):
     db = get_db()
     team = db.execute("SELECT * FROM teams WHERE id = ?", (team_id,)).fetchone()
@@ -204,7 +212,8 @@ def team_login_qr(team_id: int, request: Request, format: str = "png"):
     return Response(content=buf.getvalue(), media_type="image/png")
 
 
-@router.delete("/teams/{team_id}", dependencies=[Depends(require_admin)])
+@router.delete("/teams/{team_id}", dependencies=[Depends(require_admin)],
+               responses={404: {"description": "Team nicht gefunden"}})
 def delete_team(team_id: int):
     db = get_db()
     db.execute("DELETE FROM scans WHERE team_id = ?", (team_id,))
@@ -262,8 +271,9 @@ def list_all_scans():
     return [dict(r) for r in rows]
 
 
-@router.put("/scans/{scan_id}/approve")
-def approve_scan(scan_id: int, body: ApprovalRequest, credentials: HTTPBasicCredentials = Depends(require_admin)):
+@router.put("/scans/{scan_id}/approve",
+            responses={400: {"description": "Ungültiger Status"}, 404: {"description": "Scan nicht gefunden"}})
+def approve_scan(scan_id: int, body: ApprovalRequest, credentials: Annotated[HTTPBasicCredentials, Depends(require_admin)]):
     if body.status not in ("approved", "rejected"):
         raise HTTPException(400, "Status muss 'approved' oder 'rejected' sein")
     db = get_db()
@@ -287,8 +297,9 @@ def approve_scan(scan_id: int, body: ApprovalRequest, credentials: HTTPBasicCred
     return {"success": True}
 
 
-@router.delete("/scans/{scan_id}")
-def delete_scan(scan_id: int, credentials: HTTPBasicCredentials = Depends(require_admin)):
+@router.delete("/scans/{scan_id}",
+               responses={404: {"description": "Scan nicht gefunden"}})
+def delete_scan(scan_id: int, credentials: Annotated[HTTPBasicCredentials, Depends(require_admin)]):
     db = get_db()
     scan = db.execute("SELECT * FROM scans WHERE id = ?", (scan_id,)).fetchone()
     if not scan:

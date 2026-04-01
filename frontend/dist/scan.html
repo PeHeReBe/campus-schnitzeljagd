@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Station scannen</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body>
   <header>
     <h1>🏛️ Station scannen</h1>
@@ -28,7 +30,7 @@
       </div>
 
       <div class="card hidden" id="scan-question">
-        <h2 id="q-station-name"></h2>
+        <div id="q-station-name" class="card-label">Station</div>
         <p id="q-text"></p>
         <div id="q-mc" class="hidden">
           <div id="mc-choices"></div>
@@ -45,7 +47,7 @@
       </div>
 
       <div class="card hidden" id="scan-result">
-        <h2 id="scan-success-title"></h2>
+        <div id="scan-result-info" class="card-label">Ergebnis</div>
         <p id="scan-success-msg"></p>
         <a href="/">Zurück zur Übersicht</a>
       </div>
@@ -80,7 +82,7 @@
             teamData = await loginRes.json();
             teamData.token = savedToken;
             proceedWithStation();
-          } catch {}
+          } catch { }
         })();
       }
     } else {
@@ -261,13 +263,13 @@
       document.getElementById('scan-result').classList.remove('hidden');
 
       if (data.status === 'approved') {
-        document.getElementById('scan-success-title').textContent = `✅ ${data.station}`;
+        document.getElementById('scan-result-info').textContent = `✅ ${data.station}`;
         document.getElementById('scan-success-msg').textContent = `+${data.points} Punkte für euer Team!`;
       } else if (data.status === 'rejected') {
-        document.getElementById('scan-success-title').textContent = `❌ ${data.station}`;
+        document.getElementById('scan-result-info').textContent = `❌ ${data.station}`;
         document.getElementById('scan-success-msg').textContent = data.message || 'Falsche Antwort!';
       } else {
-        document.getElementById('scan-success-title').textContent = `⏳ ${data.station}`;
+        document.getElementById('scan-result-info').textContent = `⏳ ${data.station}`;
         document.getElementById('scan-success-msg').textContent = data.message || 'Antwort eingereicht — wird geprüft.';
       }
     }
@@ -279,4 +281,5 @@
     }
   </script>
 </body>
+
 </html>

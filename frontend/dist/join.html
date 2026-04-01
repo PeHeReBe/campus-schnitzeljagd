@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="de">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Team beitreten</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
+
 <body>
   <header>
     <h1>🏛️ Team beitreten</h1>
@@ -18,7 +20,7 @@
       </div>
 
       <div class="card hidden" id="join-success">
-        <h2 id="join-title"></h2>
+        <div id="join-info" class="card-label">Lade...</div>
         <p id="join-msg"></p>
         <div class="actions">
           <a href="/"><button>Zur Übersicht</button></a>
@@ -67,7 +69,7 @@
 
         document.getElementById('join-loading').classList.add('hidden');
         document.getElementById('join-success').classList.remove('hidden');
-        document.getElementById('join-title').textContent = `✅ Willkommen bei Team "${team.name}"!`;
+        document.getElementById('join-info').textContent = `✅ Willkommen bei Team "${team.name}"!`;
         document.getElementById('join-msg').textContent = 'Du bist jetzt angemeldet. Scanne QR-Codes an den Stationen, um Punkte zu sammeln!';
       } catch (err) {
         document.getElementById('join-loading').classList.add('hidden');
@@ -77,4 +79,5 @@
     })();
   </script>
 </body>
+
 </html>
