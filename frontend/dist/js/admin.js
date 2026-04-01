@@ -1,5 +1,32 @@
 // ---- Admin Panel JS ----
-const AUTH = 'Basic ' + btoa('admin:campus2026');
+let AUTH = '';
+
+// Login gate
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const user = document.getElementById('login-user').value;
+  const pass = document.getElementById('login-pass').value;
+  const testAuth = 'Basic ' + btoa(user + ':' + pass);
+  try {
+    const res = await fetch('/api/admin/stats', { headers: { 'Authorization': testAuth } });
+    if (!res.ok) throw new Error();
+    AUTH = testAuth;
+    document.getElementById('admin-login').classList.add('hidden');
+    document.getElementById('admin-app').classList.remove('hidden');
+    document.getElementById('login-error').textContent = '';
+    loadAdminStations();
+  } catch {
+    document.getElementById('login-error').textContent = 'Ungültige Zugangsdaten';
+  }
+});
+
+document.getElementById('btn-logout').addEventListener('click', () => {
+  AUTH = '';
+  document.getElementById('admin-app').classList.add('hidden');
+  document.getElementById('admin-login').classList.remove('hidden');
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+});
 
 // Navigation
 document.querySelectorAll('.nav-btn[data-view]').forEach(btn => {

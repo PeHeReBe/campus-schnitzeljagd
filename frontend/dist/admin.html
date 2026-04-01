@@ -7,6 +7,19 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
+  <!-- Login Gate -->
+  <div id="admin-login" class="card" style="max-width:360px;margin:3rem auto;padding:2rem;">
+    <h2>🔐 Admin Login</h2>
+    <form id="login-form">
+      <label>Benutzer <input type="text" id="login-user" required autocomplete="username"></label>
+      <label>Passwort <input type="password" id="login-pass" required autocomplete="current-password"></label>
+      <button type="submit">Anmelden</button>
+    </form>
+    <p id="login-error" class="error"></p>
+  </div>
+
+  <!-- Admin Panel (hidden until login) -->
+  <div id="admin-app" class="hidden">
   <header>
     <h1>⚙️ Admin Panel</h1>
     <nav>
@@ -17,6 +30,7 @@
       <button class="nav-btn" data-view="admin-log">Protokoll</button>
       <button class="nav-btn" data-view="admin-stats">Statistik</button>
       <a href="/" class="nav-btn">← Zurück</a>
+      <button id="btn-logout" class="nav-btn" style="margin-left:auto;">🚪 Logout</button>
     </nav>
   </header>
 
@@ -109,6 +123,7 @@
       </div>
     </section>
   </main>
+  </div><!-- end admin-app -->
 
   <script src="/js/admin.js"></script>
 </body>
