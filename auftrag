@@ -1,0 +1,182 @@
+Deployment Architektur
+Grundprinzip
+
+Das gesamte System muss in einem einzigen Docker-Container laufen.
+
+Es dürfen keine zusätzlichen Container, Services oder externe Abhängigkeiten existieren.
+
+Alle Komponenten laufen innerhalb desselben Containers.
+
+Ziel:
+
+einfache Installation
+minimaler Wartungsaufwand
+kompatibel mit Uni-Server Infrastruktur
+Start mit einem einzigen Docker-Befehl
+Systemarchitektur im Container
+
+Innerhalb des Containers laufen:
+
+Reverse Proxy
+Backend API
+WebSocket Server
+Frontend (statische Dateien)
+Datenbank
+QR-Code Generator
+
+Struktur:
+
+Browser
+   |
+   |
+Reverse Proxy (Nginx)
+   |
+Backend Server (API + WebSockets)
+   |
+Database (SQLite)
+Technologievorgaben
+
+Um den Single-Container-Ansatz zu ermöglichen, werden folgende Technologien empfohlen.
+
+Backend
+
+Empfohlen:
+
+Node.js (Express / Fastify)
+
+Alternative:
+
+Python FastAPI
+
+Das Backend übernimmt:
+
+API
+Team Logik
+Realtime Synchronisation
+Validierung
+Datenbankzugriff
+Datenbank
+
+Empfohlen:
+
+SQLite
+
+Grund:
+
+keine separate Datenbank notwendig
+perfekt für Single-Container
+ausreichend für Eventgröße
+
+Datenbankdatei:
+
+/data/hunt.db
+Frontend
+
+Frontend wird als statische Web-App gebaut.
+
+Beispiel:
+
+React / Vue build
+
+Ergebnis:
+
+/app/frontend/dist
+
+Der Reverse Proxy liefert die Dateien aus.
+
+Realtime Synchronisation
+
+Team-Synchronisation erfolgt über:
+
+WebSockets
+
+oder
+
+Server-Sent Events
+
+Der WebSocket Server läuft im Backend.
+
+Containerstruktur
+
+Beispiel Verzeichnisstruktur:
+
+/app
+
+/backend
+/frontend
+/data
+/logs
+
+server.js
+hunt.db
+Dockerfile Beispiel
+FROM node:20
+
+WORKDIR /app
+
+COPY package.json .
+RUN npm install
+
+COPY . .
+
+RUN npm run build-frontend
+
+EXPOSE 8080
+
+CMD ["node", "server.js"]
+Containerstart
+
+Der gesamte Service muss startbar sein mit:
+
+docker run -p 8080:8080 campus-hunt
+
+Danach erreichbar unter:
+
+http://server-ip:8080
+Persistente Daten
+
+Folgende Daten müssen persistent sein:
+
+/data
+/logs
+
+Beim Docker Start können Volumes genutzt werden:
+
+-v hunt_data:/data
+Performance Ziel
+
+Das System muss unterstützen:
+
+300–500 Studierende
+50–100 Teams
+viele gleichzeitige Requests
+
+SQLite ist ausreichend für diese Last.
+
+Vorteile des Single-Container Designs
+
+✔ einfache Installation
+✔ keine komplexe Infrastruktur
+✔ kein Kubernetes oder Docker Compose nötig
+✔ minimaler Wartungsaufwand
+✔ ideal für kurzfristige Events
+
+Grundregel für Claude
+
+Claude darf keine Architektur erzeugen, die:
+
+mehrere Container benötigt
+externe Datenbanken nutzt
+externe Services verwendet
+Cloud-Dienste benötigt
+
+Das gesamte System muss vollständig autark in einem Container laufen.
+
+Ziel
+
+Ein vollständig lokales, browserbasiertes System für eine Campus-Schnitzeljagd, das:
+
+DSGVO-konform ist
+auf Uni-Servern läuft
+ohne externe Dienste funktioniert
+mit einem einzigen Docker-Container deploybar ist

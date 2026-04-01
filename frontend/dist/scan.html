@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Station scannen</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>🏛️ Station scannen</h1>
+  </header>
+  <main>
+    <section class="view active">
+      <div class="card" id="scan-auth">
+        <h2>QR-Code gescannt!</h2>
+        <p>Melde dich mit deinem Team an, um die Station zu registrieren.</p>
+        <form id="scan-form">
+          <label>Teamname
+            <input type="text" id="scan-team" required>
+          </label>
+          <label>PIN
+            <input type="password" id="scan-pin" required>
+          </label>
+          <button type="submit">Weiter</button>
+        </form>
+        <p id="scan-error" class="error"></p>
+      </div>
+
+      <div class="card hidden" id="scan-question">
+        <h2 id="q-station-name"></h2>
+        <p id="q-text"></p>
+        <div id="q-mc" class="hidden">
+          <div id="mc-choices"></div>
+        </div>
+        <div id="q-text-input" class="hidden">
+          <label>Deine Antwort <textarea id="text-answer" rows="3"></textarea></label>
+        </div>
+        <div id="q-photo" class="hidden">
+          <label>Foto hochladen <input type="file" id="photo-input" accept="image/*"></label>
+          <div id="photo-preview"></div>
+        </div>
+        <button id="btn-submit-answer">Antwort abschicken</button>
+        <p id="q-error" class="error"></p>
+      </div>
+
+      <div class="card hidden" id="scan-result">
+        <h2 id="scan-success-title"></h2>
+        <p id="scan-success-msg"></p>
+        <a href="/">Zurück zur Übersicht</a>
+      </div>
+    </section>
+  </main>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    let teamData = null;
+    let stationData = null;
+
+    // Check for token-based login from localStorage
+    const savedToken = localStorage.getItem('hunt_token');
+    const savedTeamId = localStorage.getItem('hunt_team_id');
+    const savedName = localStorage.getItem('hunt_team');
+
+    if (savedToken && savedTeamId && savedName) {
+      // Auto-login with token - skip the login form entirely
+      if (code) {
+        (async () => {
+          try {
+            // Verify token is still valid
+            const loginRes = await fetch('/api/teams/token-login', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: savedToken })
+            });
+            if (!loginRes.ok) {
+              // Token invalid, show login form
+              return;
+            }
+            teamData = await loginRes.json();
+            teamData.token = savedToken;
+            proceedWithStation();
+          } catch {}
+        })();
+      }
+    } else {
+      // Fallback: try old pin-based credentials
+      const savedPin = localStorage.getItem('hunt_pin');
+      if (savedName && savedPin) {
+        document.getElementById('scan-team').value = savedName;
+        document.getElementById('scan-pin').value = savedPin;
+        if (code) setTimeout(() => document.getElementById('scan-form').dispatchEvent(new Event('submit')), 100);
+      }
+    }
+
+    document.getElementById('scan-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const errEl = document.getElementById('scan-error');
+      errEl.textContent = '';
+
+      if (!code) { errEl.textContent = 'Kein gültiger QR-Code.'; return; }
+
+      const name = document.getElementById('scan-team').value;
+      const pin = document.getElementById('scan-pin').value;
+
+      // Login with name+pin
+      let loginRes = await fetch('/api/teams/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, pin })
+      });
+      if (!loginRes.ok) {
+        const d = await loginRes.json();
+        errEl.textContent = d.detail || d.error || 'Login fehlgeschlagen';
+        return;
+      }
+      teamData = await loginRes.json();
+      teamData.pin = pin;
+      teamData.token = teamData.login_token || '';
+      // Save token for future
+      if (teamData.login_token) {
+        localStorage.setItem('hunt_team_id', String(teamData.id));
+        localStorage.setItem('hunt_team', name);
+        localStorage.setItem('hunt_token', teamData.login_token);
+      }
+
+      proceedWithStation();
+    });
+
+    async function proceedWithStation() {
+      const errEl = document.getElementById('scan-error');
+      // Look up station type by code
+      let infoRes = await fetch(`/api/stations/by-code/${code}`);
+      if (!infoRes.ok) {
+        doDirectScan();
+        return;
+      }
+      stationData = await infoRes.json();
+
+      const qType = stationData.question_type || 'qr_only';
+      if (qType === 'qr_only') {
+        doDirectScan();
+        return;
+      }
+
+      // Show question UI
+      document.getElementById('scan-auth').classList.add('hidden');
+      document.getElementById('scan-question').classList.remove('hidden');
+      document.getElementById('q-station-name').textContent = stationData.name;
+      document.getElementById('q-text').textContent = stationData.question_text || '';
+
+      if (qType === 'multiple_choice') {
+        document.getElementById('q-mc').classList.remove('hidden');
+        const choicesDiv = document.getElementById('mc-choices');
+        const choices = stationData.choices || [];
+        choicesDiv.innerHTML = choices.map((c, i) => `
+          <label class="mc-option">
+            <input type="radio" name="mc" value="${esc(c)}"> ${esc(c)}
+          </label>
+        `).join('');
+      } else if (qType === 'text_answer') {
+        document.getElementById('q-text-input').classList.remove('hidden');
+      } else if (qType === 'photo_upload') {
+        document.getElementById('q-photo').classList.remove('hidden');
+      }
+    }
+
+    // Photo preview
+    document.getElementById('photo-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      const preview = document.getElementById('photo-preview');
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          preview.innerHTML = `<img src="${ev.target.result}" style="max-width:100%;max-height:200px;margin-top:0.5rem;border-radius:8px;">`;
+        };
+        reader.readAsDataURL(file);
+      } else {
+        preview.innerHTML = '';
+      }
+    });
+
+    document.getElementById('btn-submit-answer').addEventListener('click', async () => {
+      const errEl = document.getElementById('q-error');
+      errEl.textContent = '';
+      const qType = stationData.question_type;
+
+      if (qType === 'photo_upload') {
+        const fileInput = document.getElementById('photo-input');
+        if (!fileInput.files.length) {
+          errEl.textContent = 'Bitte wähle ein Foto aus.';
+          return;
+        }
+        const formData = new FormData();
+        if (teamData.token) formData.append('token', teamData.token);
+        if (teamData.pin) formData.append('pin', teamData.pin);
+        formData.append('code', code);
+        formData.append('file', fileInput.files[0]);
+
+        const res = await fetch(`/api/teams/${teamData.id}/upload`, {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errEl.textContent = data.detail || data.error || 'Upload fehlgeschlagen';
+          return;
+        }
+        showResult(data);
+      } else {
+        let answer = '';
+        if (qType === 'multiple_choice') {
+          const sel = document.querySelector('input[name="mc"]:checked');
+          if (!sel) { errEl.textContent = 'Bitte wähle eine Antwort.'; return; }
+          answer = sel.value;
+        } else if (qType === 'text_answer') {
+          answer = document.getElementById('text-answer').value.trim();
+          if (!answer) { errEl.textContent = 'Bitte gib eine Antwort ein.'; return; }
+        }
+
+        const body = { code, answer };
+        if (teamData.token) body.token = teamData.token;
+        if (teamData.pin) body.pin = teamData.pin;
+
+        const res = await fetch(`/api/teams/${teamData.id}/scan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          errEl.textContent = data.detail || data.error || 'Fehler beim Senden';
+          return;
+        }
+        showResult(data);
+      }
+    });
+
+    async function doDirectScan() {
+      const errEl = document.getElementById('scan-error');
+      const body = { code };
+      if (teamData.token) body.token = teamData.token;
+      if (teamData.pin) body.pin = teamData.pin;
+
+      const res = await fetch(`/api/teams/${teamData.id}/scan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        errEl.textContent = data.detail || data.error || 'Scan fehlgeschlagen';
+        return;
+      }
+      showResult(data);
+    }
+
+    function showResult(data) {
+      document.getElementById('scan-auth').classList.add('hidden');
+      document.getElementById('scan-question').classList.add('hidden');
+      document.getElementById('scan-result').classList.remove('hidden');
+
+      if (data.status === 'approved') {
+        document.getElementById('scan-success-title').textContent = `✅ ${data.station}`;
+        document.getElementById('scan-success-msg').textContent = `+${data.points} Punkte für euer Team!`;
+      } else if (data.status === 'rejected') {
+        document.getElementById('scan-success-title').textContent = `❌ ${data.station}`;
+        document.getElementById('scan-success-msg').textContent = data.message || 'Falsche Antwort!';
+      } else {
+        document.getElementById('scan-success-title').textContent = `⏳ ${data.station}`;
+        document.getElementById('scan-success-msg').textContent = data.message || 'Antwort eingereicht — wird geprüft.';
+      }
+    }
+
+    function esc(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+  </script>
+</body>
+</html>

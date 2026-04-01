@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Team beitreten</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>🏛️ Team beitreten</h1>
+  </header>
+  <main>
+    <section class="view active">
+      <div class="card" id="join-loading">
+        <h2>⏳ Anmeldung läuft...</h2>
+        <p>Du wirst automatisch deinem Team zugewiesen.</p>
+      </div>
+
+      <div class="card hidden" id="join-success">
+        <h2 id="join-title"></h2>
+        <p id="join-msg"></p>
+        <div class="actions">
+          <a href="/"><button>Zur Übersicht</button></a>
+        </div>
+      </div>
+
+      <div class="card hidden" id="join-error">
+        <h2>❌ Fehler</h2>
+        <p id="join-error-msg"></p>
+        <div class="actions">
+          <a href="/"><button>Zur Startseite</button></a>
+        </div>
+      </div>
+    </section>
+  </main>
+  <script>
+    (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const token = params.get('token');
+
+      if (!token) {
+        document.getElementById('join-loading').classList.add('hidden');
+        document.getElementById('join-error').classList.remove('hidden');
+        document.getElementById('join-error-msg').textContent = 'Kein gültiger Einladungslink.';
+        return;
+      }
+
+      try {
+        const res = await fetch('/api/teams/token-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        if (!res.ok) {
+          const d = await res.json();
+          throw new Error(d.detail || d.error || 'Login fehlgeschlagen');
+        }
+        const team = await res.json();
+
+        // Save credentials in localStorage
+        localStorage.setItem('hunt_team_id', String(team.id));
+        localStorage.setItem('hunt_team', team.name);
+        localStorage.setItem('hunt_token', token);
+        // Clear old pin-based credentials
+        localStorage.removeItem('hunt_pin');
+
+        document.getElementById('join-loading').classList.add('hidden');
+        document.getElementById('join-success').classList.remove('hidden');
+        document.getElementById('join-title').textContent = `✅ Willkommen bei Team "${team.name}"!`;
+        document.getElementById('join-msg').textContent = 'Du bist jetzt angemeldet. Scanne QR-Codes an den Stationen, um Punkte zu sammeln!';
+      } catch (err) {
+        document.getElementById('join-loading').classList.add('hidden');
+        document.getElementById('join-error').classList.remove('hidden');
+        document.getElementById('join-error-msg').textContent = err.message;
+      }
+    })();
+  </script>
+</body>
+</html>

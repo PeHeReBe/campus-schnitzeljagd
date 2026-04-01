@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Campus Schnitzeljagd</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <header>
+    <h1>🏛️ Campus Schnitzeljagd</h1>
+    <nav>
+      <button class="nav-btn active" data-view="home">Start</button>
+      <button class="nav-btn" data-view="team">Team</button>
+      <button class="nav-btn" data-view="leaderboard">Rangliste</button>
+      <button class="nav-btn" data-view="stations">Stationen</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- Home -->
+    <section id="view-home" class="view active">
+      <div class="card">
+        <h2>Willkommen zur Campus Schnitzeljagd!</h2>
+        <p>Erkundet den Campus, scannt QR-Codes an den Stationen und sammelt Punkte für euer Team.</p>
+        <p>Scanne den <strong>Team-QR-Code</strong> von eurem Admin, um beizutreten.</p>
+      </div>
+    </section>
+
+    <!-- Team -->
+    <section id="view-team" class="view">
+      <div class="card" id="team-auth">
+        <h2>Team Login</h2>
+        <p>Scanne den QR-Code deines Teams oder melde dich an:</p>
+        <form id="team-form">
+          <label>Teamname
+            <input type="text" id="team-name" required maxlength="50">
+          </label>
+          <label>PIN
+            <input type="password" id="team-pin" required minlength="4" maxlength="20">
+          </label>
+          <div class="actions">
+            <button type="submit">Anmelden</button>
+          </div>
+        </form>
+        <p id="team-error" class="error"></p>
+      </div>
+
+      <div class="card hidden" id="team-dashboard">
+        <h2>Team: <span id="dash-team-name"></span></h2>
+        <p>Gefundene Stationen: <strong id="dash-found">0</strong></p>
+        <ul id="dash-scans"></ul>
+        <div class="actions">
+          <button onclick="logout()">Abmelden</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Leaderboard -->
+    <section id="view-leaderboard" class="view">
+      <div class="card">
+        <h2>Rangliste</h2>
+        <table id="leaderboard-table">
+          <thead>
+            <tr><th>#</th><th>Team</th><th>Stationen</th><th>Punkte</th></tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- Stations -->
+    <section id="view-stations" class="view">
+      <div class="card">
+        <h2>Stationen</h2>
+        <div id="stations-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="/js/app.js"></script>
+</body>
+</html>
