@@ -12,7 +12,7 @@ if [ ! -f "$COMPOSE_FILE" ]; then
 fi
 
 while true; do
-  if docker pull "$IMAGE" >/dev/null; then
+  if docker pull "$IMAGE"; then
     CURRENT_IMAGE_ID="$(docker compose -f "$COMPOSE_FILE" images -q "$SERVICE" 2>/dev/null || true)"
     LATEST_IMAGE_ID="$(docker image inspect "$IMAGE" --format '{{.Id}}' 2>/dev/null || true)"
 
