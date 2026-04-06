@@ -1,0 +1,12 @@
+services:
+  campus-schnitzeljagd:
+    image: ghcr.io/peherebe/campus-schnitzeljagd:latest
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - campus_data:/data
+
+volumes:
+  campus_data:
+    name: campus_data

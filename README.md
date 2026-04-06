@@ -215,6 +215,27 @@ docker run -d \
 
 Die Datenbank und Uploads werden im Volume `/data` gespeichert und überleben Container-Neustarts.
 
+### Docker Compose mit GHCR (`latest`)
+
+```bash
+# Service starten (Port 8080 und persistentes Named Volume)
+docker compose up -d
+```
+
+Die `docker-compose.yml` verwendet:
+- Image: `ghcr.io/peherebe/campus-schnitzeljagd:latest`
+- Port-Mapping: `8080:8080`
+- Persistentes Named Volume: `campus_data` → `/data`
+
+### Auto-Update Script
+
+```bash
+chmod +x autoupdate.sh
+CHECK_INTERVAL_SECONDS=30 ./autoupdate.sh
+```
+
+Das Script prüft in kurzem Intervall auf neue `latest`-Images und führt nur bei Änderungen ein `docker compose up -d` für den Service aus.
+
 ---
 
 ## API-Referenz
