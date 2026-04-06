@@ -234,7 +234,7 @@ chmod +x autoupdate.sh
 CHECK_INTERVAL_SECONDS=30 ./autoupdate.sh
 ```
 
-Das Script prüft in kurzem Intervall auf neue `latest`-Images und führt nur bei Änderungen ein `docker compose up -d` für den Service aus.
+Das Script prüft standardmäßig alle 60 Sekunden (konfigurierbar über `CHECK_INTERVAL_SECONDS`) auf neue `latest`-Images und führt nur bei Änderungen ein `docker compose up -d` für den Service aus.
 
 ---
 
