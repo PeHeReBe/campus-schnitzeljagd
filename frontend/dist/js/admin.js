@@ -289,7 +289,7 @@ function renderScans() {
       answerHtml = `<p><strong>Antwort:</strong> ${esc(item.answer)}</p>`;
     }
     return `
-    <div class="card scan-item" style="margin-bottom:0.75rem;border-left:4px solid ${item.status==='approved'?'#27ae60':item.status==='pending'?'#f59e0b':'#e74c3c'}">
+    <div class="card scan-item" style="margin-bottom:0.75rem;border-left:4px solid ${item.status === 'approved' ? '#27ae60' : item.status === 'pending' ? '#f59e0b' : '#e74c3c'}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem">
         <div>
           <strong>${esc(item.team_name)}</strong> → ${esc(item.station_name)}

@@ -1,0 +1,20 @@
+{
+  "name": "campus-hunt",
+  "version": "1.0.0",
+  "description": "Campus Schnitzeljagd - Single Container System",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/",
+    "build-frontend": "echo 'Static frontend - no build needed'"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "express": "^4.21.0",
+    "qrcode": "^1.5.4",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.0.0"
+  }
+}
