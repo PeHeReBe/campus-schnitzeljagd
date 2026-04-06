@@ -4,7 +4,7 @@ set -euo pipefail
 IMAGE="ghcr.io/peherebe/campus-schnitzeljagd:latest"
 SERVICE="campus-schnitzeljagd"
 COMPOSE_FILE="${COMPOSE_FILE:-$(dirname "$0")/docker-compose.yml}"
-CHECK_INTERVAL_SECONDS="${CHECK_INTERVAL_SECONDS:-60}"
+CHECK_INTERVAL_SECONDS="${CHECK_INTERVAL_SECONDS:-30}"
 
 if [ ! -f "$COMPOSE_FILE" ]; then
   echo "Compose file not found: $COMPOSE_FILE" >&2
@@ -17,7 +17,7 @@ while true; do
     LATEST_IMAGE_ID="$(docker image inspect "$IMAGE" --format '{{.Id}}' 2>/dev/null || true)"
 
     if [ -n "$LATEST_IMAGE_ID" ] && [ "$CURRENT_IMAGE_ID" != "$LATEST_IMAGE_ID" ]; then
-      echo "[$(date -Iseconds)] New image detected, recreating service..."
+      echo "[$(date -Iseconds)] New image detected, updating service..."
       docker compose -f "$COMPOSE_FILE" up -d "$SERVICE"
     else
       echo "[$(date -Iseconds)] No update available."
