@@ -2,12 +2,15 @@ import secrets
 import io
 import json
 import hashlib
+import re
+import sqlite3
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from typing import Annotated, Optional, List
 import os
 import qrcode
+from fpdf import FPDF
 
 from ..database import get_db
 from ..ws import broadcast_sync
@@ -222,6 +225,400 @@ def delete_team(team_id: int):
     if result.rowcount == 0:
         raise HTTPException(404, "Team nicht gefunden")
     return {"success": True}
+
+
+class BulkTeamCreate(BaseModel):
+    prefix: Optional[str] = "Team"
+    count: Optional[int] = 20
+    start: Optional[int] = 1
+
+
+@router.post("/teams/bulk", status_code=201, dependencies=[Depends(require_admin)])
+def create_teams_bulk(body: BulkTeamCreate):
+    if not body.count or body.count < 1 or body.count > 100:
+        raise HTTPException(400, "Anzahl muss zwischen 1 und 100 liegen")
+    prefix = (body.prefix or "Team").strip()
+    if not prefix:
+        raise HTTPException(400, "Prefix benötigt")
+    start = body.start if body.start is not None else 1
+    db = get_db()
+    created = []
+    errors = []
+    for i in range(start, start + body.count):
+        name = f"{prefix} {i}"
+        pin = secrets.token_hex(4)
+        pin_hash = hashlib.sha256(pin.encode()).hexdigest()
+        login_token = secrets.token_urlsafe(24)
+        try:
+            cur = db.execute(
+                "INSERT INTO teams (name, pin, login_token) VALUES (?, ?, ?)",
+                (name, pin_hash, login_token)
+            )
+            db.commit()
+            created.append({"id": cur.lastrowid, "name": name, "login_token": login_token})
+        except Exception as e:
+            if isinstance(e, sqlite3.IntegrityError):
+                errors.append(f"'{name}' bereits vergeben")
+            else:
+                errors.append(f"Fehler bei '{name}': Team konnte nicht angelegt werden")
+    return {"created": created, "errors": errors}
+
+
+# ---- Import ----
+
+class MarkdownImport(BaseModel):
+    markdown: str
+    default_points: Optional[int] = 10
+    question_type: Optional[str] = "text_answer"
+
+
+@router.post("/import-questions", status_code=201, dependencies=[Depends(require_admin)])
+def import_questions(body: MarkdownImport):
+    valid_types = ("qr_only", "multiple_choice", "text_answer", "photo_upload")
+    qtype = body.question_type if body.question_type in valid_types else "text_answer"
+    points = body.default_points if body.default_points and body.default_points > 0 else 10
+
+    # Split on horizontal rules (--- or *** or ___)
+    # Use explicit character classes to avoid polynomial backtracking
+    raw_sections = re.split(r'\n[ \t]*[-*_]{3,}[ \t]*\n', body.markdown)
+
+    db = get_db()
+    imported = []
+    skipped = []
+
+    for idx, section in enumerate(raw_sections):
+        section = section.strip()
+        if not section:
+            continue
+
+        lines = section.splitlines()
+
+        # Extract name and subtitle from headings
+        name = None
+        subtitle = None
+        body_lines = []
+        seen_heading = False
+        for line in lines:
+            stripped = line.strip()
+            if stripped.startswith('### ') and subtitle is None:
+                subtitle = stripped[4:].strip()
+                seen_heading = True
+            elif stripped.startswith('## ') and name is None:
+                name = stripped[3:].strip()
+                seen_heading = True
+            elif stripped.startswith('# ') and name is None:
+                name = stripped[2:].strip()
+                seen_heading = True
+            elif seen_heading:
+                body_lines.append(line)
+
+        # Skip sections without a ### subtitle – they are typically intro/instructions blocks
+        if subtitle is None:
+            # Fall back: import if heading looks like a short identifier (≤4 words, no multi-## subheadings)
+            multi_section_count = sum(
+                1 for l in lines
+                if l.strip().startswith('## ')
+            )
+            if multi_section_count >= 2 or name is None:
+                skipped.append(f"Abschnitt {idx + 1}: übersprungen (kein Untertitel / Einleitungsblock)")
+                continue
+
+        # Use subtitle as name if available (more descriptive), fallback to heading
+        display_name = subtitle if subtitle else name
+        if not display_name:
+            skipped.append(f"Abschnitt {idx + 1}: kein auswertbarer Titel")
+            continue
+
+        # Combine number prefix from heading with subtitle for clarity
+        if subtitle and name:
+            display_name = f"{name}: {subtitle}"
+
+        # Build question text from body
+        question_text = "\n".join(body_lines).strip()
+        # Remove markdown image references using bounded quantifiers to prevent ReDoS
+        question_text = re.sub(r'!\[[^\]]{0,500}\]\([^)]{0,500}\)', '', question_text).strip()
+
+        code = secrets.token_hex(8)
+        cur = db.execute(
+            """INSERT INTO stations (name, description, lat, lng, code, points, sort_order,
+               question_type, question_text, choices, correct_answer) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (display_name, "", None, None, code, points, idx,
+             qtype, question_text, "[]", "")
+        )
+        db.commit()
+        imported.append({"id": cur.lastrowid, "name": display_name})
+
+    return {"imported": imported, "skipped": skipped, "count": len(imported)}
+
+
+# ---- PDF Exports ----
+
+def _make_qr_png_bytes(url: str) -> bytes:
+    img = qrcode.make(url, box_size=10, border=2)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _pdf_safe(text: str) -> str:
+    """Remove characters not supported by FPDF built-in fonts (latin-1 range only)."""
+    return text.encode("latin-1", errors="ignore").decode("latin-1")
+
+
+@router.get("/export/stations-qr-pdf", dependencies=[Depends(require_admin)])
+def export_stations_qr_pdf(request: Request):
+    db = get_db()
+    stations = db.execute("SELECT * FROM stations ORDER BY sort_order").fetchall()
+    if not stations:
+        raise HTTPException(404, "Keine Stationen vorhanden")
+
+    base_url = str(request.base_url).rstrip("/")
+
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=10)
+
+    # A4 = 210mm wide, 297mm tall
+    # Layout: 2 columns, 3 rows per page = 6 QR codes per page
+    cols = 2
+    margin = 10
+    cell_w = (210 - margin * 2) / cols  # ~95mm
+    qr_size = 70  # mm
+    label_h = 10
+    cell_h = qr_size + label_h + 8  # total cell height with padding
+
+    items = list(stations)
+    per_page = 6
+    pages = (len(items) + per_page - 1) // per_page
+
+    for page_i in range(pages):
+        pdf.add_page()
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 10, "Station QR-Codes", align="C", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(0, 5, "Campus Schnitzeljagd", align="C", new_x="LMARGIN", new_y="NEXT")
+        start_y = pdf.get_y() + 4
+
+        for slot in range(per_page):
+            idx = page_i * per_page + slot
+            if idx >= len(items):
+                break
+            station = items[idx]
+            col = slot % cols
+            row = slot // cols
+            x = margin + col * cell_w + (cell_w - qr_size) / 2
+            y = start_y + row * cell_h
+
+            scan_url = f"{base_url}/scan.html?code={station['code']}"
+            qr_bytes = _make_qr_png_bytes(scan_url)
+
+            # Write QR to temp buffer and add to PDF
+            buf = io.BytesIO(qr_bytes)
+            pdf.image(buf, x=x, y=y, w=qr_size, h=qr_size)
+
+            # Station name label
+            pdf.set_font("Helvetica", "B", 9)
+            pdf.set_xy(margin + col * cell_w, y + qr_size + 1)
+            pdf.cell(cell_w, 5, _pdf_safe(station['name']), align="C", new_x="RIGHT", new_y="TOP")
+
+            # Station points/type label
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_xy(margin + col * cell_w, y + qr_size + 6)
+            pdf.cell(cell_w, 4, f"{station['points']} Punkte - {station['question_type']}", align="C")
+
+    pdf_bytes = pdf.output()
+    return Response(
+        content=bytes(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=station-qr-codes.pdf"}
+    )
+
+
+@router.get("/export/teams-qr-pdf", dependencies=[Depends(require_admin)])
+def export_teams_qr_pdf(request: Request):
+    db = get_db()
+    teams = db.execute("SELECT * FROM teams ORDER BY id").fetchall()
+    if not teams:
+        raise HTTPException(404, "Keine Teams vorhanden")
+
+    base_url = str(request.base_url).rstrip("/")
+
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=10)
+
+    cols = 2
+    margin = 10
+    cell_w = (210 - margin * 2) / cols
+    qr_size = 70
+    label_h = 10
+    cell_h = qr_size + label_h + 8
+
+    items = list(teams)
+    per_page = 6
+    pages = (len(items) + per_page - 1) // per_page
+
+    for page_i in range(pages):
+        pdf.add_page()
+        pdf.set_font("Helvetica", "B", 14)
+        pdf.cell(0, 10, "Team Login QR-Codes", align="C", new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.cell(0, 5, "Campus Schnitzeljagd - zum Ausdrucken und Verteilen", align="C", new_x="LMARGIN", new_y="NEXT")
+        start_y = pdf.get_y() + 4
+
+        for slot in range(per_page):
+            idx = page_i * per_page + slot
+            if idx >= len(items):
+                break
+            team = items[idx]
+            col = slot % cols
+            row = slot // cols
+            x = margin + col * cell_w + (cell_w - qr_size) / 2
+            y = start_y + row * cell_h
+
+            join_url = f"{base_url}/join.html?token={team['login_token']}"
+            qr_bytes = _make_qr_png_bytes(join_url)
+
+            buf = io.BytesIO(qr_bytes)
+            pdf.image(buf, x=x, y=y, w=qr_size, h=qr_size)
+
+            pdf.set_font("Helvetica", "B", 10)
+            pdf.set_xy(margin + col * cell_w, y + qr_size + 1)
+            pdf.cell(cell_w, 5, _pdf_safe(team['name']), align="C", new_x="RIGHT", new_y="TOP")
+
+            pdf.set_font("Helvetica", "", 8)
+            pdf.set_xy(margin + col * cell_w, y + qr_size + 7)
+            pdf.cell(cell_w, 4, "Scanne zum Einloggen", align="C")
+
+    pdf_bytes = pdf.output()
+    return Response(
+        content=bytes(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=team-qr-codes.pdf"}
+    )
+
+
+@router.get("/export/questions-pdf", dependencies=[Depends(require_admin)])
+def export_questions_pdf():
+    db = get_db()
+    stations = db.execute("SELECT * FROM stations ORDER BY sort_order").fetchall()
+
+    pdf = FPDF(orientation="P", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=15)
+    margin = 15
+
+    QTYPE_LABELS = {
+        "qr_only": "Nur QR-Code",
+        "multiple_choice": "Multiple Choice",
+        "text_answer": "Text-Antwort",
+        "photo_upload": "Foto-Upload",
+    }
+
+    # ---- Title Page ----
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 24)
+    pdf.ln(30)
+    pdf.cell(0, 12, "Campus Schnitzeljagd", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.set_font("Helvetica", "", 16)
+    pdf.cell(0, 10, "Fragen & Spielanleitung", align="C", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(10)
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 8, f"Anzahl Stationen: {len(stations)}", align="C", new_x="LMARGIN", new_y="NEXT")
+
+    # ---- Instructions Page ----
+    pdf.add_page()
+    pdf.set_font("Helvetica", "B", 16)
+    pdf.cell(0, 10, "Spielanleitung", new_x="LMARGIN", new_y="NEXT")
+    pdf.ln(3)
+
+    instructions = [
+        ("Ziel des Spiels",
+         "Findet alle versteckten QR-Codes auf dem Campus und beantwortet die Fragen an den Stationen. "
+         "Das Team mit den meisten Punkten gewinnt!"),
+        ("QR-Code scannen",
+         "Scannt den QR-Code an jeder Station mit eurer Kamera oder dem QR-Code-Scanner eures Ger\xe4ts. "
+         "Ihr werdet automatisch zur Frage weitergeleitet."),
+        ("Fragen beantworten",
+         "Je nach Stationstyp m\xfcsst ihr: eine Multiple-Choice-Frage beantworten, eine Freitextantwort eingeben, "
+         "ein Foto hochladen oder einfach den QR-Code scannen."),
+        ("Punkte sammeln",
+         "F\xfcr jede richtige/genehmigte Antwort erhaltet ihr Punkte. "
+         "Richtige Multiple-Choice-Antworten werden sofort genehmigt. "
+         "Text- und Fotoantworten m\xfcssen vom Admin genehmigt werden."),
+        ("Rangliste",
+         "Die aktuelle Rangliste ist jederzeit auf der Startseite sichtbar. "
+         "Punkte werden in Echtzeit aktualisiert."),
+        ("Hinweise f\xfcr Helfer",
+         "Stellt sicher, dass alle QR-Codes gut sichtbar und erreichbar angebracht sind. "
+         "Behaltet die ausstehenden Antworten im Admin-Panel im Blick und genehmigt oder lehnt sie zeitnah ab."),
+    ]
+
+    for title, text in instructions:
+        pdf.set_font("Helvetica", "B", 12)
+        pdf.cell(0, 8, title, new_x="LMARGIN", new_y="NEXT")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.multi_cell(0, 6, text)
+        pdf.ln(3)
+
+    # ---- Questions Pages ----
+    if stations:
+        pdf.add_page()
+        pdf.set_font("Helvetica", "B", 16)
+        pdf.cell(0, 10, "Stationen und Fragen", new_x="LMARGIN", new_y="NEXT")
+        pdf.ln(3)
+
+        for i, station in enumerate(stations):
+            # Check if we need a new page (rough estimate)
+            if pdf.get_y() > 250:
+                pdf.add_page()
+
+            qtype_label = QTYPE_LABELS.get(station['question_type'], station['question_type'])
+
+            # Station header
+            pdf.set_font("Helvetica", "B", 12)
+            header = _pdf_safe(f"Station {i + 1}: {station['name']}")
+            pdf.cell(0, 8, header, new_x="LMARGIN", new_y="NEXT")
+
+            # Meta info
+            pdf.set_font("Helvetica", "", 9)
+            meta = f"Typ: {qtype_label}   |   Punkte: {station['points']}"
+            pdf.cell(0, 5, meta, new_x="LMARGIN", new_y="NEXT")
+
+            # Description
+            if station['description']:
+                pdf.set_font("Helvetica", "I", 10)
+                pdf.multi_cell(0, 5, _pdf_safe(station['description']))
+
+            # Question text
+            if station['question_text']:
+                pdf.set_font("Helvetica", "", 10)
+                pdf.multi_cell(0, 6, _pdf_safe(station['question_text']))
+
+            # Multiple choice options
+            if station['question_type'] == 'multiple_choice' and station['choices']:
+                try:
+                    choices = json.loads(station['choices'])
+                    if choices:
+                        pdf.set_font("Helvetica", "B", 10)
+                        pdf.cell(0, 5, "Antwortm\xf6glichkeiten:", new_x="LMARGIN", new_y="NEXT")
+                        pdf.set_font("Helvetica", "", 10)
+                        for j, choice in enumerate(choices):
+                            letter = chr(65 + j)  # A, B, C, ...
+                            pdf.cell(8, 5, f"{letter})", new_x="RIGHT", new_y="TOP")
+                            pdf.multi_cell(0, 5, _pdf_safe(choice))
+                except (json.JSONDecodeError, TypeError):
+                    pass
+
+            pdf.ln(4)
+            # Horizontal divider
+            y = pdf.get_y()
+            pdf.line(margin, y, 210 - margin, y)
+            pdf.ln(3)
+
+    pdf_bytes = pdf.output()
+    return Response(
+        content=bytes(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=fragen-spielanleitung.pdf"}
+    )
 
 
 # ---- Stats ----

@@ -1,6 +1,12 @@
 // ---- Admin Panel JS ----
 let AUTH = '';
 
+// Load version badge on page load
+fetch('/api/version').then(r => r.json()).then(data => {
+  const el = document.getElementById('version-text');
+  if (el) el.textContent = data.version || 'dev';
+}).catch(() => {});
+
 // Login gate
 document.getElementById('login-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -53,7 +59,7 @@ async function adminApi(url, opts = {}) {
   };
   if (opts.body && typeof opts.body === 'object') opts.body = JSON.stringify(opts.body);
   const res = await fetch(url, opts);
-  if (url.includes('/qr') && res.ok) return res;
+  if ((url.includes('/qr') || url.includes('/pdf')) && res.ok) return res;
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || data.error || 'Fehler');
   return data;
@@ -162,6 +168,66 @@ async function deleteStation(id) {
   loadAdminStations();
 }
 
+// ---- Markdown Import ----
+document.getElementById('btn-import').addEventListener('click', async () => {
+  const markdown = document.getElementById('import-markdown').value.trim();
+  if (!markdown) {
+    alert('Bitte Markdown-Inhalt einfügen.');
+    return;
+  }
+  const points = Number(document.getElementById('import-points').value) || 10;
+  const qtype = document.getElementById('import-qtype').value;
+  const resultEl = document.getElementById('import-result');
+  resultEl.textContent = 'Importiere...';
+  try {
+    const result = await adminApi('/api/admin/import-questions', {
+      method: 'POST',
+      body: { markdown, default_points: points, question_type: qtype }
+    });
+    let msg = `✅ ${result.count} Station(en) importiert.`;
+    if (result.skipped && result.skipped.length) {
+      msg += ` ⚠️ ${result.skipped.length} übersprungen.`;
+    }
+    resultEl.textContent = msg;
+    document.getElementById('import-markdown').value = '';
+    loadAdminStations();
+  } catch (err) {
+    resultEl.textContent = '❌ Fehler: ' + err.message;
+  }
+});
+
+// ---- PDF Exports ----
+async function downloadPdf(url, filename) {
+  try {
+    const res = await fetch(url, { headers: { 'Authorization': AUTH } });
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.detail || 'Fehler');
+    }
+    const blob = await res.blob();
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(objUrl);
+  } catch (err) {
+    alert('PDF-Export fehlgeschlagen: ' + err.message);
+  }
+}
+
+document.getElementById('btn-export-stations-qr-pdf').addEventListener('click', () => {
+  downloadPdf('/api/admin/export/stations-qr-pdf', 'station-qr-codes.pdf');
+});
+
+document.getElementById('btn-export-questions-pdf').addEventListener('click', () => {
+  downloadPdf('/api/admin/export/questions-pdf', 'fragen-spielanleitung.pdf');
+});
+
+document.getElementById('btn-export-teams-qr-pdf').addEventListener('click', () => {
+  downloadPdf('/api/admin/export/teams-qr-pdf', 'team-qr-codes.pdf');
+});
+
 // ---- Teams ----
 document.getElementById('create-team-form').addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -172,6 +238,30 @@ document.getElementById('create-team-form').addEventListener('submit', async (e)
     loadAdminTeams();
   } catch (err) {
     alert(err.message);
+  }
+});
+
+// ---- Bulk Team Creation ----
+document.getElementById('bulk-team-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const prefix = document.getElementById('bulk-prefix').value.trim() || 'Team';
+  const start = Number(document.getElementById('bulk-start').value) || 1;
+  const count = Number(document.getElementById('bulk-count').value) || 20;
+  const resultEl = document.getElementById('bulk-result');
+  resultEl.textContent = 'Erstelle Teams...';
+  try {
+    const result = await adminApi('/api/admin/teams/bulk', {
+      method: 'POST',
+      body: { prefix, start, count }
+    });
+    let msg = `✅ ${result.created.length} Team(s) erstellt.`;
+    if (result.errors && result.errors.length) {
+      msg += ` ⚠️ ${result.errors.length} Fehler: ${result.errors.slice(0, 3).join(', ')}`;
+    }
+    resultEl.textContent = msg;
+    loadAdminTeams();
+  } catch (err) {
+    resultEl.textContent = '❌ Fehler: ' + err.message;
   }
 });
 

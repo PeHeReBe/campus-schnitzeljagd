@@ -4,3 +4,4 @@ websockets==13.0
 qrcode[pil]==8.0
 aiofiles==24.1.0
 python-multipart==0.0.12
+fpdf2==2.8.2
