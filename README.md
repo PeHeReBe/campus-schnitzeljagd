@@ -172,7 +172,7 @@ Im Tab **Teams** ganz unten: **Alle Teams & Scans zurücksetzen**
 ### Foto-Upload Einschränkungen
 
 - **Erlaubte Formate**: JPEG, PNG, WebP, GIF
-- **Maximale Größe**: 5 MB pro Bild
+- **Maximale Größe**: 50 MB pro Bild
 
 ---
 

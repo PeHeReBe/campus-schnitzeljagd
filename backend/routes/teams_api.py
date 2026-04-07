@@ -9,6 +9,7 @@ from ..database import get_db, DATA_DIR
 from ..ws import broadcast_sync
 
 UPLOADS_DIR = os.path.join(DATA_DIR, "uploads")
+MAX_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
 router = APIRouter(prefix="/api/teams", tags=["teams"])
@@ -162,10 +163,10 @@ def upload_photo(team_id: int, code: Annotated[str, Form(...)], file: Annotated[
     if file.content_type not in allowed:
         raise HTTPException(400, "Nur Bilddateien (JPEG, PNG, WebP, GIF) erlaubt")
 
-    # Read and limit file size (max 5 MB)
-    content = file.file.read(5 * 1024 * 1024 + 1)
-    if len(content) > 5 * 1024 * 1024:
-        raise HTTPException(400, "Datei zu groß (max 5 MB)")
+    # Read and limit file size (max 50 MB)
+    content = file.file.read(MAX_UPLOAD_SIZE_BYTES + 1)
+    if len(content) > MAX_UPLOAD_SIZE_BYTES:
+        raise HTTPException(400, "Datei zu groß (max 50 MB)")
 
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "jpg"
     if ext not in ("jpg", "jpeg", "png", "webp", "gif"):
