@@ -14,6 +14,9 @@ RUN mkdir -p /data /logs
 ENV DATA_DIR=/data
 ENV PORT=8080
 
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
+
 EXPOSE 8080
 
 CMD ["python", "app.py"]

@@ -1,6 +1,12 @@
 // ---- State ----
 let currentTeam = null;
 
+// Load version badge
+fetch('/api/version').then(r => r.json()).then(data => {
+  const el = document.getElementById('version-text');
+  if (el) el.textContent = data.version || 'dev';
+}).catch(() => {});
+
 // ---- Credential Storage ----
 function saveCredentials(teamId, name, token) {
   localStorage.setItem('hunt_team_id', String(teamId));
