@@ -164,8 +164,8 @@ def upload_photo(team_id: int, code: Annotated[str, Form(...)], file: Annotated[
 
     # Read and limit file size (max 5 MB)
     content = file.file.read(5 * 1024 * 1024 + 1)
-    if len(content) > 5 * 1024 * 1024:
-        raise HTTPException(400, "Datei zu groß (max 5 MB)")
+    if len(content) > 50 * 1024 * 1024:
+        raise HTTPException(400, "Datei zu groß (max 50 MB)")
 
     ext = file.filename.rsplit(".", 1)[-1].lower() if "." in (file.filename or "") else "jpg"
     if ext not in ("jpg", "jpeg", "png", "webp", "gif"):
