@@ -259,7 +259,7 @@ def create_teams_bulk(body: BulkTeamCreate):
             if "UNIQUE" in str(e):
                 errors.append(f"'{name}' bereits vergeben")
             else:
-                errors.append(f"Fehler bei '{name}': {str(e)}")
+                errors.append(f"Fehler bei '{name}': Team konnte nicht angelegt werden")
     return {"created": created, "errors": errors}
 
 
@@ -278,7 +278,8 @@ def import_questions(body: MarkdownImport):
     points = body.default_points if body.default_points and body.default_points > 0 else 10
 
     # Split on horizontal rules (--- or *** or ___)
-    raw_sections = re.split(r'\n\s*[-*_]{3,}\s*\n', body.markdown)
+    # Use explicit character classes to avoid polynomial backtracking
+    raw_sections = re.split(r'\n[ \t]*[-*_]{3,}[ \t]*\n', body.markdown)
 
     db = get_db()
     imported = []
@@ -301,10 +302,10 @@ def import_questions(body: MarkdownImport):
             if stripped.startswith('### ') and subtitle is None:
                 subtitle = stripped[4:].strip()
                 seen_heading = True
-            elif stripped.startswith('## ') and not stripped.startswith('### ') and name is None:
+            elif stripped.startswith('## ') and name is None:
                 name = stripped[3:].strip()
                 seen_heading = True
-            elif stripped.startswith('# ') and not stripped.startswith('## ') and name is None:
+            elif stripped.startswith('# ') and name is None:
                 name = stripped[2:].strip()
                 seen_heading = True
             elif seen_heading:
@@ -315,7 +316,7 @@ def import_questions(body: MarkdownImport):
             # Fall back: import if heading looks like a short identifier (≤4 words, no multi-## subheadings)
             multi_section_count = sum(
                 1 for l in lines
-                if l.strip().startswith('## ') and not l.strip().startswith('### ')
+                if l.strip().startswith('## ')
             )
             if multi_section_count >= 2 or name is None:
                 skipped.append(f"Abschnitt {idx + 1}: übersprungen (kein Untertitel / Einleitungsblock)")
@@ -333,8 +334,8 @@ def import_questions(body: MarkdownImport):
 
         # Build question text from body
         question_text = "\n".join(body_lines).strip()
-        # Remove markdown image references
-        question_text = re.sub(r'!\[.*?\]\(.*?\)', '', question_text).strip()
+        # Remove markdown image references (use atomic character classes to avoid ReDoS)
+        question_text = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', question_text).strip()
 
         code = secrets.token_hex(8)
         cur = db.execute(
@@ -532,19 +533,19 @@ def export_questions_pdf():
          "Findet alle versteckten QR-Codes auf dem Campus und beantwortet die Fragen an den Stationen. "
          "Das Team mit den meisten Punkten gewinnt!"),
         ("QR-Code scannen",
-         "Scannt den QR-Code an jeder Station mit eurer Kamera oder dem QR-Code-Scanner eures Geraets. "
+         "Scannt den QR-Code an jeder Station mit eurer Kamera oder dem QR-Code-Scanner eures Ger\xe4ts. "
          "Ihr werdet automatisch zur Frage weitergeleitet."),
         ("Fragen beantworten",
-         "Je nach Stationstyp muesst ihr: eine Multiple-Choice-Frage beantworten, eine Freitextantwort eingeben, "
+         "Je nach Stationstyp m\xfcsst ihr: eine Multiple-Choice-Frage beantworten, eine Freitextantwort eingeben, "
          "ein Foto hochladen oder einfach den QR-Code scannen."),
         ("Punkte sammeln",
-         "Fuer jede richtige/genehmigte Antwort erhaltet ihr Punkte. "
+         "F\xfcr jede richtige/genehmigte Antwort erhaltet ihr Punkte. "
          "Richtige Multiple-Choice-Antworten werden sofort genehmigt. "
-         "Text- und Fotoantworten muessen vom Admin genehmigt werden."),
+         "Text- und Fotoantworten m\xfcssen vom Admin genehmigt werden."),
         ("Rangliste",
          "Die aktuelle Rangliste ist jederzeit auf der Startseite sichtbar. "
          "Punkte werden in Echtzeit aktualisiert."),
-        ("Hinweise fuer Helfer",
+        ("Hinweise f\xfcr Helfer",
          "Stellt sicher, dass alle QR-Codes gut sichtbar und erreichbar angebracht sind. "
          "Behaltet die ausstehenden Antworten im Admin-Panel im Blick und genehmigt oder lehnt sie zeitnah ab."),
     ]
@@ -596,7 +597,7 @@ def export_questions_pdf():
                     choices = json.loads(station['choices'])
                     if choices:
                         pdf.set_font("Helvetica", "B", 10)
-                        pdf.cell(0, 5, "Antwortmoeglichkeiten:", new_x="LMARGIN", new_y="NEXT")
+                        pdf.cell(0, 5, "Antwortm\xf6glichkeiten:", new_x="LMARGIN", new_y="NEXT")
                         pdf.set_font("Helvetica", "", 10)
                         for j, choice in enumerate(choices):
                             letter = chr(65 + j)  # A, B, C, ...
