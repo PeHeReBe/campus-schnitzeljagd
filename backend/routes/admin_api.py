@@ -8,6 +8,9 @@ from pydantic import BaseModel
 from typing import Annotated, Optional, List
 import os
 import qrcode
+from reportlab.pdfgen import canvas as pdf_canvas
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.utils import ImageReader
 
 from ..database import get_db
 from ..ws import broadcast_sync
@@ -153,6 +156,67 @@ def station_qr(station_id: int, request: Request, format: str = "png"):
     return Response(content=buf.getvalue(), media_type="image/png")
 
 
+@router.get("/stations/qr-pdf", dependencies=[Depends(require_admin)])
+def stations_qr_pdf(request: Request):
+    """Generate a single PDF containing all station QR codes."""
+    db = get_db()
+    stations = db.execute("SELECT * FROM stations ORDER BY sort_order").fetchall()
+    if not stations:
+        raise HTTPException(404, "Keine Stationen vorhanden")
+
+    base_url = str(request.base_url).rstrip("/")
+    buf = io.BytesIO()
+    c = pdf_canvas.Canvas(buf, pagesize=A4)
+    page_w, page_h = A4
+
+    margin = 40
+    cols, rows_per_page = 3, 4
+    title_h = 40
+    usable_w = page_w - 2 * margin
+    usable_h = page_h - 2 * margin - title_h
+    cell_w = usable_w / cols
+    cell_h = usable_h / rows_per_page
+    qr_size = min(cell_w - 20, cell_h - 35)
+    items_per_page = cols * rows_per_page
+
+    for idx, station in enumerate(stations):
+        if idx % items_per_page == 0:
+            if idx > 0:
+                c.showPage()
+            c.setFont("Helvetica-Bold", 16)
+            c.drawCentredString(page_w / 2, page_h - margin - 15, "Stationen QR-Codes")
+
+        pos = idx % items_per_page
+        col = pos % cols
+        row = pos // cols
+
+        cell_x = margin + col * cell_w
+        cell_top = page_h - margin - title_h - row * cell_h
+        qr_x = cell_x + (cell_w - qr_size) / 2
+        qr_y = cell_top - qr_size - 2
+
+        scan_url = f"{base_url}/scan.html?code={station['code']}"
+        qr_img = qrcode.make(scan_url, box_size=10, border=2)
+        img_buf = io.BytesIO()
+        qr_img.save(img_buf, format="PNG")
+        img_buf.seek(0)
+
+        c.drawImage(ImageReader(img_buf), qr_x, qr_y, qr_size, qr_size)
+        c.setFont("Helvetica-Bold", 9)
+        name_text = (station['name'][:28] + '...') if len(station['name']) > 28 else station['name']
+        c.drawCentredString(cell_x + cell_w / 2, qr_y - 11, name_text)
+        c.setFont("Helvetica", 7)
+        c.drawCentredString(cell_x + cell_w / 2, qr_y - 20, f"{station['points']} Punkte")
+
+    c.save()
+    buf.seek(0)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=stationen-qr-codes.pdf"}
+    )
+
+
 # ---- Teams ----
 
 @router.get("/teams", dependencies=[Depends(require_admin)])
@@ -210,6 +274,65 @@ def team_login_qr(team_id: int, request: Request, format: str = "png"):
     buf = io.BytesIO()
     img.save(buf, format="PNG")
     return Response(content=buf.getvalue(), media_type="image/png")
+
+
+@router.get("/teams/qr-pdf", dependencies=[Depends(require_admin)])
+def teams_qr_pdf(request: Request):
+    """Generate a single PDF containing all team login QR codes."""
+    db = get_db()
+    teams = db.execute("SELECT * FROM teams ORDER BY name").fetchall()
+    if not teams:
+        raise HTTPException(404, "Keine Teams vorhanden")
+
+    base_url = str(request.base_url).rstrip("/")
+    buf = io.BytesIO()
+    c = pdf_canvas.Canvas(buf, pagesize=A4)
+    page_w, page_h = A4
+
+    margin = 40
+    cols, rows_per_page = 3, 4
+    title_h = 40
+    usable_w = page_w - 2 * margin
+    usable_h = page_h - 2 * margin - title_h
+    cell_w = usable_w / cols
+    cell_h = usable_h / rows_per_page
+    qr_size = min(cell_w - 20, cell_h - 35)
+    items_per_page = cols * rows_per_page
+
+    for idx, team in enumerate(teams):
+        if idx % items_per_page == 0:
+            if idx > 0:
+                c.showPage()
+            c.setFont("Helvetica-Bold", 16)
+            c.drawCentredString(page_w / 2, page_h - margin - 15, "Team Login QR-Codes")
+
+        pos = idx % items_per_page
+        col = pos % cols
+        row = pos // cols
+
+        cell_x = margin + col * cell_w
+        cell_top = page_h - margin - title_h - row * cell_h
+        qr_x = cell_x + (cell_w - qr_size) / 2
+        qr_y = cell_top - qr_size - 2
+
+        join_url = f"{base_url}/join.html?token={team['login_token']}"
+        qr_img = qrcode.make(join_url, box_size=10, border=2)
+        img_buf = io.BytesIO()
+        qr_img.save(img_buf, format="PNG")
+        img_buf.seek(0)
+
+        c.drawImage(ImageReader(img_buf), qr_x, qr_y, qr_size, qr_size)
+        c.setFont("Helvetica-Bold", 9)
+        name_text = (team['name'][:28] + '...') if len(team['name']) > 28 else team['name']
+        c.drawCentredString(cell_x + cell_w / 2, qr_y - 11, name_text)
+
+    c.save()
+    buf.seek(0)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": "attachment; filename=teams-qr-codes.pdf"}
+    )
 
 
 @router.delete("/teams/{team_id}", dependencies=[Depends(require_admin)],

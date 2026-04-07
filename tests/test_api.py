@@ -370,6 +370,117 @@ class TestCampusHunt(unittest.TestCase):
         r = client.post("/api/teams", json={"name": "Hacker", "pin": "1234"})
         self.assertIn(r.status_code, [404, 405, 422])
 
+    # ---- Station Edit Tests (QR code must NOT change) ----
+
+    def test_39_edit_station_preserves_qr_code(self):
+        """Editing a station must not change the code (QR stays the same)."""
+        # Get current station data
+        r = client.get("/api/admin/stations", headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        station = next(s for s in r.json() if s["id"] == self.station_id)
+        original_code = station["code"]
+
+        # Edit the station
+        r = client.put(f"/api/admin/stations/{self.station_id}", json={
+            "name": "Bibliothek Umbenannt",
+            "description": "Neue Beschreibung",
+            "points": 25,
+        }, headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        self.assertEqual(r.status_code, 200)
+        self.assertTrue(r.json()["success"])
+
+        # Verify code is unchanged but other fields are updated
+        r = client.get("/api/admin/stations", headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        station = next(s for s in r.json() if s["id"] == self.station_id)
+        self.assertEqual(station["code"], original_code)
+        self.assertEqual(station["name"], "Bibliothek Umbenannt")
+        self.assertEqual(station["description"], "Neue Beschreibung")
+        self.assertEqual(station["points"], 25)
+
+    def test_40_edit_station_change_question_type(self):
+        """Editing a station's question_type and all related fields."""
+        r = client.put(f"/api/admin/stations/{self.mc_station_id}", json={
+            "name": "MC Station Edited",
+            "question_type": "text_answer",
+            "question_text": "Neue Frage als Text",
+            "choices": [],
+            "correct_answer": "",
+        }, headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        self.assertEqual(r.status_code, 200)
+
+        r = client.get("/api/admin/stations", headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        station = next(s for s in r.json() if s["id"] == self.mc_station_id)
+        self.assertEqual(station["question_type"], "text_answer")
+        self.assertEqual(station["question_text"], "Neue Frage als Text")
+
+    def test_41_edit_station_to_multiple_choice(self):
+        """Can change a station to multiple_choice with choices and correct answer."""
+        r = client.put(f"/api/admin/stations/{self.station_id}", json={
+            "question_type": "multiple_choice",
+            "question_text": "Welche Farbe hat das Gebäude?",
+            "choices": ["Rot", "Blau", "Grün"],
+            "correct_answer": "Rot",
+        }, headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        self.assertEqual(r.status_code, 200)
+
+        r = client.get("/api/admin/stations", headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        station = next(s for s in r.json() if s["id"] == self.station_id)
+        self.assertEqual(station["question_type"], "multiple_choice")
+        self.assertIn("Rot", station["choices"])
+
+    def test_42_edit_nonexistent_station(self):
+        """Editing a station that doesn't exist returns 404."""
+        r = client.put("/api/admin/stations/99999", json={
+            "name": "Ghost"
+        }, headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        self.assertEqual(r.status_code, 404)
+
+    def test_43_edit_station_partial_update(self):
+        """Partial update: only change one field, rest stays the same."""
+        r = client.get("/api/admin/stations", headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        station = next(s for s in r.json() if s["id"] == self.station_id)
+        old_desc = station["description"]
+
+        r = client.put(f"/api/admin/stations/{self.station_id}", json={
+            "points": 99,
+        }, headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        self.assertEqual(r.status_code, 200)
+
+        r = client.get("/api/admin/stations", headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        station = next(s for s in r.json() if s["id"] == self.station_id)
+        self.assertEqual(station["points"], 99)
+        self.assertEqual(station["description"], old_desc)
+
+    # ---- Bulk QR PDF Tests ----
+
+    def test_44_stations_qr_pdf(self):
+        """Bulk PDF of all station QR codes should return a valid PDF."""
+        r = client.get("/api/admin/stations/qr-pdf",
+                       headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.headers["content-type"], "application/pdf")
+        # PDF files start with %PDF
+        self.assertTrue(r.content[:5].startswith(b"%PDF"))
+        self.assertGreater(len(r.content), 1000)
+
+    def test_45_teams_qr_pdf(self):
+        """Bulk PDF of all team QR codes should return a valid PDF."""
+        r = client.get("/api/admin/teams/qr-pdf",
+                       headers={"Authorization": f"Basic {ADMIN_AUTH}"})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.headers["content-type"], "application/pdf")
+        self.assertTrue(r.content[:5].startswith(b"%PDF"))
+        self.assertGreater(len(r.content), 1000)
+
+    def test_46_stations_qr_pdf_requires_auth(self):
+        """Bulk station PDF requires admin auth."""
+        r = client.get("/api/admin/stations/qr-pdf")
+        self.assertIn(r.status_code, [401, 403])
+
+    def test_47_teams_qr_pdf_requires_auth(self):
+        """Bulk team PDF requires admin auth."""
+        r = client.get("/api/admin/teams/qr-pdf")
+        self.assertIn(r.status_code, [401, 403])
+
 
 if __name__ == "__main__":
     unittest.main()

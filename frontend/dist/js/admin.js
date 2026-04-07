@@ -1,5 +1,6 @@
 // ---- Admin Panel JS ----
 let AUTH = '';
+let adminStationsData = [];
 
 // Login gate
 document.getElementById('login-form').addEventListener('submit', async (e) => {
@@ -120,6 +121,7 @@ document.getElementById('create-station-form').addEventListener('submit', async 
 
 async function loadAdminStations() {
   const stations = await adminApi('/api/admin/stations');
+  adminStationsData = stations;
   const el = document.getElementById('admin-stations-list');
   if (!stations.length) {
     el.innerHTML = '<p>Keine Stationen vorhanden.</p>';
@@ -137,6 +139,7 @@ async function loadAdminStations() {
           <p style="font-size:0.8rem;opacity:0.6">Code: <code>${s.code}</code></p>
         </div>
         <div class="btns">
+          <button onclick="openEditModal(${s.id})">✏️ Bearbeiten</button>
           <button onclick="downloadQR(${s.id}, '${esc(s.name)}')">QR ⬇</button>
           <button class="danger" onclick="deleteStation(${s.id})">Löschen</button>
         </div>
@@ -349,6 +352,118 @@ async function loadStats() {
     <div class="stat-box"><div class="num">${stats.scanCount}</div><div class="label">Scans</div></div>
     <div class="stat-box"><div class="num">${stats.pendingCount}</div><div class="label">Ausstehend</div></div>
   `;
+}
+
+// ---- Edit Station Modal ----
+function openEditModal(stationId) {
+  const station = adminStationsData.find(s => s.id === stationId);
+  if (!station) return;
+
+  document.getElementById('edit-st-id').value = station.id;
+  document.getElementById('edit-st-name').value = station.name || '';
+  document.getElementById('edit-st-desc').value = station.description || '';
+  document.getElementById('edit-st-points').value = station.points;
+  document.getElementById('edit-st-order').value = station.sort_order;
+  document.getElementById('edit-st-qtype').value = station.question_type || 'qr_only';
+  document.getElementById('edit-st-qtext').value = station.question_text || '';
+
+  let choices = [];
+  try {
+    choices = typeof station.choices === 'string' ? JSON.parse(station.choices) : (station.choices || []);
+  } catch (e) { choices = []; }
+  document.getElementById('edit-st-choices').value = choices.join('\n');
+  document.getElementById('edit-st-correct').value = station.correct_answer || '';
+
+  updateEditQTypeFields(station.question_type || 'qr_only');
+  document.getElementById('edit-station-modal').classList.remove('hidden');
+}
+
+function updateEditQTypeFields(qtype) {
+  const qFields = document.getElementById('edit-q-fields');
+  const mcFields = document.getElementById('edit-mc-fields');
+  if (qtype === 'qr_only') {
+    qFields.classList.add('hidden');
+  } else {
+    qFields.classList.remove('hidden');
+    if (qtype === 'multiple_choice') {
+      mcFields.classList.remove('hidden');
+    } else {
+      mcFields.classList.add('hidden');
+    }
+  }
+}
+
+function closeEditModal() {
+  document.getElementById('edit-station-modal').classList.add('hidden');
+}
+
+document.getElementById('edit-st-qtype').addEventListener('change', (e) => {
+  updateEditQTypeFields(e.target.value);
+});
+
+document.getElementById('edit-station-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const stationId = document.getElementById('edit-st-id').value;
+  const qtype = document.getElementById('edit-st-qtype').value;
+  const body = {
+    name: document.getElementById('edit-st-name').value,
+    description: document.getElementById('edit-st-desc').value,
+    points: Number(document.getElementById('edit-st-points').value),
+    sort_order: Number(document.getElementById('edit-st-order').value),
+    question_type: qtype,
+    question_text: document.getElementById('edit-st-qtext').value || ''
+  };
+  if (qtype === 'multiple_choice') {
+    const choicesText = document.getElementById('edit-st-choices').value.trim();
+    body.choices = choicesText.split('\n').map(c => c.trim()).filter(c => c);
+    body.correct_answer = document.getElementById('edit-st-correct').value.trim();
+  } else {
+    body.choices = [];
+    body.correct_answer = '';
+  }
+  try {
+    await adminApi(`/api/admin/stations/${stationId}`, { method: 'PUT', body });
+    closeEditModal();
+    loadAdminStations();
+  } catch (err) {
+    alert(err.message);
+  }
+});
+
+// Close modal on overlay click
+document.getElementById('edit-station-modal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeEditModal();
+});
+
+// ---- Bulk PDF Downloads ----
+async function downloadAllStationQRs() {
+  try {
+    const res = await adminApi('/api/admin/stations/qr-pdf');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'stationen-qr-codes.pdf';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert(err.message);
+  }
+}
+
+async function downloadAllTeamQRs() {
+  try {
+    const res = await adminApi('/api/admin/teams/qr-pdf');
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'teams-qr-codes.pdf';
+    a.click();
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert(err.message);
+  }
 }
 
 // Initial load
