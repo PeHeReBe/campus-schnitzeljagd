@@ -186,6 +186,7 @@ Im Tab **Teams** ganz unten: **Alle Teams & Scans zurücksetzen**
 | `ADMIN_USER` | `admin` | Admin-Benutzername |
 | `ADMIN_PASS` | `campus2026` | Admin-Passwort |
 | `DATA_DIR` | `backend/data` | Pfad für Datenbank & Uploads |
+| `TRUSTED_PROXY_IPS` | `134.169.82.149` | Vertrauenswürdige Reverse-Proxy-IP(s) für Forwarded-Header |
 
 ### Beispiel: Andere Zugangsdaten
 
@@ -224,6 +225,8 @@ docker compose up -d
 
 Die `docker-compose.yml` verwendet:
 - Image: `ghcr.io/peherebe/campus-schnitzeljagd:latest`
+- Restart-Policy: `always`
+- Environment: `TRUSTED_PROXY_IPS=134.169.82.149`
 - Port-Mapping: `8080:8080`
 - Persistentes Named Volume: `campus_data` → `/data`
 
