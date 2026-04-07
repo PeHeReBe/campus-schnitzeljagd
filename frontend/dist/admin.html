@@ -69,42 +69,6 @@
             <button type="submit">Station erstellen</button>
           </form>
         </div>
-
-        <div class="card">
-          <h2>📥 Fragen importieren (Markdown)</h2>
-          <p style="font-size:0.9rem;opacity:0.8;margin-bottom:0.5rem">
-            Füge dein Markdown ein. Abschnitte werden durch <code>---</code> getrennt.
-            Jeder Abschnitt mit einer Überschrift wird als neue Station importiert.
-          </p>
-          <label>Standardpunkte pro Station
-            <input type="number" id="import-points" value="10" min="1" style="width:80px">
-          </label>
-          <label>Standardfragetyp
-            <select id="import-qtype">
-              <option value="text_answer">Text-Antwort</option>
-              <option value="qr_only">Nur QR-Code</option>
-              <option value="multiple_choice">Multiple Choice</option>
-              <option value="photo_upload">Foto-Upload</option>
-            </select>
-          </label>
-          <label>Markdown-Inhalt
-            <textarea id="import-markdown" rows="10" placeholder="# 01&#10;### 🎯 Stationstitel&#10;Fragetext hier...&#10;&#10;---&#10;&#10;# 02&#10;### 🏛 Weitere Station&#10;..."></textarea>
-          </label>
-          <button id="btn-import">Importieren</button>
-          <p id="import-result" style="margin-top:0.5rem;font-size:0.9rem"></p>
-        </div>
-
-        <div class="card">
-          <h2>📄 PDF Exportieren</h2>
-          <p style="font-size:0.9rem;opacity:0.8;margin-bottom:0.75rem">
-            Alle Station-QR-Codes oder die Fragen-/Spielanleitung als PDF herunterladen.
-          </p>
-          <div style="display:flex;gap:0.75rem;flex-wrap:wrap">
-            <button id="btn-export-stations-qr-pdf">🖨 Station QR-Codes als PDF</button>
-            <button id="btn-export-questions-pdf">📋 Fragen &amp; Anleitung als PDF</button>
-          </div>
-        </div>
-
         <div class="card">
           <h2>Alle Stationen</h2>
           <div id="admin-stations-list"></div>
@@ -120,34 +84,10 @@
             <button type="submit">Team erstellen</button>
           </form>
         </div>
-
-        <div class="card">
-          <h2>👥 Teams in einer Menge erstellen</h2>
-          <p style="font-size:0.9rem;opacity:0.8;margin-bottom:0.5rem">
-            Erstellt mehrere Teams auf einmal (z.B. „Team 1" bis „Team 20").
-          </p>
-          <form id="bulk-team-form" style="display:flex;gap:0.5rem;flex-wrap:wrap;align-items:flex-end">
-            <label style="flex:1;min-width:120px">Prefix
-              <input type="text" id="bulk-prefix" value="Team" maxlength="30">
-            </label>
-            <label style="flex:1;min-width:80px">Startindex
-              <input type="number" id="bulk-start" value="1" min="1">
-            </label>
-            <label style="flex:1;min-width:80px">Anzahl
-              <input type="number" id="bulk-count" value="20" min="1" max="100">
-            </label>
-            <button type="submit" style="align-self:flex-end;margin-bottom:0">Teams erstellen</button>
-          </form>
-          <p id="bulk-result" style="margin-top:0.5rem;font-size:0.9rem"></p>
-        </div>
-
         <div class="card">
           <h2>Teams</h2>
-          <div style="display:flex;gap:0.75rem;flex-wrap:wrap;margin-bottom:1rem">
-            <button id="btn-export-teams-qr-pdf">🖨 Team QR-Codes als PDF</button>
-          </div>
           <div id="admin-teams-list"></div>
-          <button id="btn-reset" class="danger">Alle Teams &amp; Scans zurücksetzen</button>
+          <button id="btn-reset" class="danger">Alle Teams & Scans zurücksetzen</button>
         </div>
       </section>
 
@@ -187,11 +127,6 @@
       </section>
     </main>
   </div><!-- end admin-app -->
-
-  <!-- Version badge -->
-  <div id="version-badge" style="position:fixed;bottom:6px;right:10px;font-size:0.65rem;opacity:0.4;pointer-events:none;z-index:9999">
-    v<span id="version-text">dev</span>
-  </div>
 
   <script src="/js/admin.js"></script>
 </body>

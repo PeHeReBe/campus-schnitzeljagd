@@ -34,12 +34,6 @@ def health():
     return {"status": "ok"}
 
 
-@app.get("/api/version")
-def version():
-    app_version = os.environ.get("APP_VERSION", "dev")
-    return {"version": app_version}
-
-
 # WebSocket
 app.websocket("/ws")(ws_endpoint)
 
