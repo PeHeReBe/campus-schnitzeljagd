@@ -24,6 +24,11 @@ while true; do
     fi
 
     LATEST_IMAGE_ID="$(docker image inspect "$IMAGE" --format '{{.Id}}' 2>/dev/null || true)"
+    # Normalize: strip sha256: prefix and truncate to 12 chars for comparison
+    CURRENT_IMAGE_ID="${CURRENT_IMAGE_ID#sha256:}"
+    CURRENT_IMAGE_ID="${CURRENT_IMAGE_ID:0:12}"
+    LATEST_IMAGE_ID="${LATEST_IMAGE_ID#sha256:}"
+    LATEST_IMAGE_ID="${LATEST_IMAGE_ID:0:12}"
 
     if [ -z "$CURRENT_IMAGE_ID" ]; then
       echo "[$(date -Iseconds)] Service not running or no current image; ensuring service is up..."
