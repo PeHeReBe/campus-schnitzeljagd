@@ -11,11 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py ./
 COPY backend/ ./backend/
 COPY frontend/ ./frontend/
-RUN SHORT_COMMIT="$(printf '%s' "$APP_COMMIT" | cut -c1-8)" && \
-    find ./frontend/dist -type f -name "*.html" -exec sed -i \
-      -e "s/__APP_VERSION__/${APP_VERSION}/g" \
-      -e "s/__APP_COMMIT_SHORT__/${SHORT_COMMIT}/g" \
-      {} +
+RUN python -c "from pathlib import Path; v='''${APP_VERSION}'''; c='''${APP_COMMIT}'''[:8]; [p.write_text(p.read_text(encoding='utf-8').replace('__APP_VERSION__', v).replace('__APP_COMMIT_SHORT__', c), encoding='utf-8') for p in Path('frontend/dist').glob('*.html')]"
 
 RUN mkdir -p /data /logs
 

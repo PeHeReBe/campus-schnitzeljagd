@@ -22,6 +22,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 access_logger = logging.getLogger("campus_hunt.access")
+TRUSTED_PROXY_IPS = {
+    ip.strip() for ip in os.environ.get("TRUSTED_PROXY_IPS", "127.0.0.1,::1").split(",") if ip.strip()
+}
 
 
 @asynccontextmanager
@@ -39,6 +42,12 @@ app.include_router(admin_router)
 
 
 def _get_client_ip(request: Request) -> str:
+    direct_ip = request.client.host if request.client else "-"
+    trust_proxy_headers = "*" in TRUSTED_PROXY_IPS or direct_ip in TRUSTED_PROXY_IPS
+
+    if not trust_proxy_headers:
+        return direct_ip
+
     x_forwarded_for = request.headers.get("x-forwarded-for", "").strip()
     if x_forwarded_for:
         return x_forwarded_for.split(",")[0].strip()
@@ -47,7 +56,7 @@ def _get_client_ip(request: Request) -> str:
     if x_real_ip:
         return x_real_ip
 
-    return request.client.host if request.client else "-"
+    return direct_ip
 
 
 @app.middleware("http")
@@ -117,6 +126,7 @@ async def spa_fallback(full_path: str):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8080))
+    trusted_proxy_ips = os.environ.get("TRUSTED_PROXY_IPS", "127.0.0.1,::1")
     print(f"Campus Hunt läuft auf http://localhost:{port}")
     print(f"Admin: http://localhost:{port}/admin.html (admin / campus2026)")
-    uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
+    uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips=trusted_proxy_ips)
