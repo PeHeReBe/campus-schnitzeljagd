@@ -3,6 +3,9 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 dist/
+!frontend/dist/
+!frontend/dist/favicon.ico
+!frontend/dist/favicon.png
 build/
 *.egg
 
