@@ -64,6 +64,11 @@ async def admin_page():
 
 @app.get("/{full_path:path}")
 async def spa_fallback(full_path: str):
+    # Serve uploaded files from backend/data/uploads
+    if full_path.startswith("uploads/"):
+        upload_path = os.path.join(UPLOADS_DIR, full_path[8:])
+        if os.path.isfile(upload_path):
+            return FileResponse(upload_path)
     file_path = os.path.join(FRONTEND_DIR, full_path)
     if full_path and os.path.isfile(file_path):
         return FileResponse(file_path)
