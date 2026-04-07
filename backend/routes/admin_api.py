@@ -12,7 +12,7 @@ from reportlab.pdfgen import canvas as pdf_canvas
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.utils import ImageReader
 
-from ..database import get_db
+from ..database import get_db, DATA_DIR
 from ..ws import broadcast_sync
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
@@ -433,7 +433,7 @@ def delete_scan(scan_id: int, credentials: Annotated[HTTPBasicCredentials, Depen
     station_name = station["name"] if station else "?"
     # Delete uploaded photo if exists
     if scan["photo_path"]:
-        photo_full = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", scan["photo_path"])
+        photo_full = os.path.join(DATA_DIR, scan["photo_path"])
         if os.path.exists(photo_full):
             os.remove(photo_full)
     db.execute("DELETE FROM scans WHERE id = ?", (scan_id,))

@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 
-from backend.database import init_db
+from backend.database import init_db, DATA_DIR
 from backend.ws import ws_endpoint
 from backend.routes.teams_api import router as teams_router
 from backend.routes.stations_api import router as stations_router
@@ -13,6 +13,7 @@ from backend.routes.admin_api import router as admin_router
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend", "dist")
+UPLOADS_DIR = os.path.join(DATA_DIR, "uploads")
 
 
 @asynccontextmanager
@@ -38,7 +39,6 @@ def health():
 app.websocket("/ws")(ws_endpoint)
 
 # Serve uploaded files
-UPLOADS_DIR = os.path.join(BASE_DIR, "backend", "data", "uploads")
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
 
