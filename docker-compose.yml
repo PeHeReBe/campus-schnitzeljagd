@@ -1,7 +1,9 @@
 services:
   campus-schnitzeljagd:
     image: ghcr.io/peherebe/campus-schnitzeljagd:latest
-    restart: unless-stopped
+    restart: always
+    environment:
+      - TRUSTED_PROXY_IPS=134.169.82.149
     ports:
       - "8080:8080"
     volumes:

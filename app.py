@@ -22,8 +22,9 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
 )
 access_logger = logging.getLogger("campus_hunt.access")
+DEFAULT_TRUSTED_PROXY_IPS = "134.169.82.149"
 TRUSTED_PROXY_IPS = {
-    ip.strip() for ip in os.environ.get("TRUSTED_PROXY_IPS", "127.0.0.1,::1").split(",") if ip.strip()
+    ip.strip() for ip in os.environ.get("TRUSTED_PROXY_IPS", DEFAULT_TRUSTED_PROXY_IPS).split(",") if ip.strip()
 }
 
 
@@ -126,7 +127,7 @@ async def spa_fallback(full_path: str):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8080))
-    trusted_proxy_ips = os.environ.get("TRUSTED_PROXY_IPS", "127.0.0.1,::1")
+    trusted_proxy_ips = os.environ.get("TRUSTED_PROXY_IPS", DEFAULT_TRUSTED_PROXY_IPS)
     print(f"Campus Hunt läuft auf http://localhost:{port}")
     print(f"Admin: http://localhost:{port}/admin.html (admin / campus2026)")
     uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips=trusted_proxy_ips)
