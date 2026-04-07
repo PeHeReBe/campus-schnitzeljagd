@@ -3,6 +3,7 @@ import io
 import json
 import hashlib
 import re
+import sqlite3
 from fastapi import APIRouter, HTTPException, Depends, Request, Response
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
@@ -256,7 +257,7 @@ def create_teams_bulk(body: BulkTeamCreate):
             db.commit()
             created.append({"id": cur.lastrowid, "name": name, "login_token": login_token})
         except Exception as e:
-            if "UNIQUE" in str(e):
+            if isinstance(e, sqlite3.IntegrityError):
                 errors.append(f"'{name}' bereits vergeben")
             else:
                 errors.append(f"Fehler bei '{name}': Team konnte nicht angelegt werden")
@@ -334,8 +335,8 @@ def import_questions(body: MarkdownImport):
 
         # Build question text from body
         question_text = "\n".join(body_lines).strip()
-        # Remove markdown image references (use atomic character classes to avoid ReDoS)
-        question_text = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', question_text).strip()
+        # Remove markdown image references using bounded quantifiers to prevent ReDoS
+        question_text = re.sub(r'!\[[^\]]{0,500}\]\([^)]{0,500}\)', '', question_text).strip()
 
         code = secrets.token_hex(8)
         cur = db.execute(
