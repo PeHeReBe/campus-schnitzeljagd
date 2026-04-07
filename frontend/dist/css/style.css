@@ -7,10 +7,10 @@
 }
 
 :root {
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
+  --primary: #dc2626;
+  --primary-dark: #b91c1c;
   --success: #16a34a;
-  --danger: #dc2626;
+  --danger: #991b1b;
   --bg: #f1f5f9;
   --card: #ffffff;
   --text: #1e293b;
@@ -278,7 +278,7 @@ th {
 }
 
 .mc-option:hover {
-  background: #dbeafe;
+  background: #fee2e2;
 }
 
 .mc-option input {
@@ -290,7 +290,7 @@ th {
   font-size: 0.75rem;
   padding: 0.2rem 0.5rem;
   border-radius: 6px;
-  background: #dbeafe;
+  background: #fee2e2;
   color: var(--primary-dark);
   margin-left: 0.5rem;
 }
@@ -365,4 +365,17 @@ th {
 .modal-close:hover {
   color: var(--text);
   background: none;
+}
+
+/* Version Badge */
+.version-badge {
+  position: fixed;
+  bottom: 0.5rem;
+  left: 0.5rem;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  opacity: 0.5;
+  z-index: 10;
+  pointer-events: none;
+  user-select: none;
 }
