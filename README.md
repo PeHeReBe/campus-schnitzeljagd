@@ -1,7 +1,7 @@
 # 🏛️ Campus Schnitzeljagd
 
 Eine QR-Code-basierte Schnitzeljagd für Campus-Events, Orientierungstage oder Teambuilding.
-Teams scannen QR-Codes an Stationen, beantworten Rätsel und sammeln Punkte — alles in Echtzeit über den Browser.
+Teams scannen QR-Codes an Stationen, beantworten Rätsel und sammeln Punkte — alles in Echtzeit über den Browser!
 
 ---
 
